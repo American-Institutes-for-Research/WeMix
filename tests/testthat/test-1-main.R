@@ -60,6 +60,36 @@ test_that("The model runs", {
 })
 
 
+context("Factor binomial")
+test_that("Factor binomial", {
+  sleepstudyM <- sleepstudyU
+  sleepstudyM$highR <- factor(ifelse(sleepstudyM$Reaction > 340, 2, 1), levels=c(1,2), labels=c("L","H"))
+  sleepstudyM$Sub <- factor(sleepstudyM$Subject, levels=300:400) 
+  m1 <- mix(highR ~ Days + (1|Subject), data=sleepstudyM, weights=c("weight1L1", "weight1L2"), family="binomial")
+  expect_equal(coef(m1), c(`(Intercept)` = -8.69336570860094, Days = 1.17236933934874), tol=1e-6)
+  summaryREF <- c("Call:",
+                  "mix(formula = highR ~ Days + (1 | Subject), data = sleepstudyM, ", 
+                  "    weights = c(\"weight1L1\", \"weight1L2\"), family = \"binomial\")", 
+                  "",
+                  "Variance terms:",
+                  " Level   Group        Name Variance Std. Error Std.Dev.", 
+                  "     2 Subject (Intercept)     7.99       5.13     2.83", "Groups:", 
+                  " Level   Group n size mean wgt sum wgt",
+                  "     2 Subject     18        1      18",
+                  "     1     Obs    180        1     180",
+                  "",
+                  "Fixed Effects:",
+                  "            Estimate Std. Error t value",
+                  "(Intercept)   -8.693      2.072   -4.20", 
+                  "Days           1.172      0.278    4.21",
+                  "",
+                  "lnl= -53.90 ")
+  withr::with_options(list(digits=2),
+                       co <- capture.output(summary(m1))
+                     )
+  expect_equal(co, summaryREF)
+})
+
 context("Unweighted model with 2 random effects")
 test_that("Agrees with lme4 3,handles missing data", {
   sleepstudyM <- sleepstudyU
@@ -92,8 +122,11 @@ ss <- sleepstudy
 ss1 <- ss
 ss2 <- ss
 doubles <- c(308, 309, 310) # subject with double obs
+
 ss2 <- rbind(ss, subset(ss, Subject %in% doubles))
 
+ss$w <- ifelse(ss$Subject %in% doubles, 2, 1)
+contrasts(ss2$Subject) <- "contr.sum"
 ss1$W1 <- ifelse(ss1$Subject %in% doubles, 2, 1)
 ss1$W2 <- 1
 ss1$bin <- ifelse(sleepstudy$Reaction<300,0,1) #for the binomial test
@@ -400,17 +433,22 @@ test_that("summary output format", {
           "     2  Subject     carTRUE    648.5      309.3    25.46 -0.42 -0.39", 
           "     1 Residual                528.8      145.7    23.00            ", 
           "Groups:",
-          "Number of obs       Subject ",
-          "          180            18 ",  "",
+          " Level   Group n size mean wgt sum wgt",
+          "     2 Subject     18        1      18",
+          "     1     Obs    180        1     180",
+          "",
           "Fixed Effects:",
           "            Estimate Std. Error t value", 
-          "(Intercept) 252.7159     6.5295 38.7040",
-          "Days         11.1938     1.5050  7.4379", "",
-          "lnl= -868.1273 ",
+          "(Intercept)   252.72       6.53   38.70",
+          "Days           11.19       1.50    7.44",
+          "",
+          "lnl= -868.13 ",
           "Intraclass Correlation= 0.713 ")
 
   wm0 <- mix(Reaction ~ Days + (Days+car|Subject), data=ss2, weights=c("w1", "w2"))
-  co <- capture.output(summary(wm0))
+  withr::with_options(list(digits=2),
+                       co <- capture.output(summary(wm0))
+                     )
   expect_equal(co, co0)
 
   co1 <- c("Call:",
@@ -422,16 +460,21 @@ test_that("summary output format", {
            "     2  Subject     carTRUE     1619        737     40.2     0  0.92", 
            "     1 Residual                  808        162     28.4            ", 
            "Groups:",
-           "Number of obs       Subject ",
-           "          180            18 ", "",
+           " Level   Group n size mean wgt sum wgt",
+           "     2 Subject     18        1      18",
+           "     1     Obs    180        1     180",
+           "",
            "Fixed Effects:",
            "            Estimate Std. Error t value",
-           "(Intercept) 236.8427     6.7062  35.317",
-           "Days          9.5941     1.5608   6.147", "",
-           "lnl= -890.6816 ",
+           "(Intercept)   236.84       6.71   35.32",
+           "Days            9.59       1.56    6.15",
+           "",
+           "lnl= -890.68 ",
            "Intraclass Correlation= 0.758 ")
   wm0 <- mix(Reaction ~ Days + (car||Subject), data=ss2, weights=c("w1", "w2"))
-  co <- capture.output(summary(wm0))
+  withr::with_options(list(digits=2),
+                       co <- capture.output(summary(wm0))
+                     )
   expect_equal(co, co1)
 })
 
@@ -624,19 +667,21 @@ test_that("Complex weighted three level model", {
   expect_equal(unname(wmr2$vars[length(wmr2$vars)]), unname(lmr2@devcomp$cmp["sigmaML"]^2), tol=1e-4)
 }) 
 
+if(!exists("edsurveyHome")) {
+  if (Sys.info()[['sysname']] == "Windows") {
+    edsurveyHome <- "C:/EdSurveyData/"
+  } else {
+    edsurveyHome <- "~/"
+  }
+}
+
 context("PISA tests")
 test_that("PISA tests", {
   skip_on_cran()
   require(EdSurvey)
   #read in data 
-  if(!exists("edsurveyHome")) {
-    if (Sys.info()[['sysname']] == "Windows") {
-      edsurveyHome <- "C:/EdSurveyData/"
-    } else {
-      edsurveyHome <- "~/EdSurveyData/"
-    }
-  }
 
+  options(timeout=60*60)
   downloadPISA(root=edsurveyHome, years=2012, cache=FALSE, verbose=FALSE)
   cntl <- readPISA(file.path(edsurveyHome, "PISA/2012"), countries = "USA", verbose=FALSE)
   om <- getAttributes(cntl, "omittedLevels")
@@ -656,8 +701,10 @@ test_that("PISA tests", {
   
   # Multivariate model with random intercept
   m1 <- mix(pv1math ~ st29q03 + sc14q02 + st04q01 + escs + (1|schoolid), data=data, weights=c("w_fstuwt", "w_fschwt"))
-  m1bref <- matrix(c(486.8037, 7.777978, -11.1083, 5.699849,-19.25533, 5.455594,-41.5422, 6.864339, -21.34052, 17.06059, -11.78236, 12.82083, -26.91253, 7.657342, 9.507693, 2.986006, 25.56825, 2.117479), ncol=2, byrow=TRUE)
-  expect_equal(unname(summary(m1)$coef[,1:2]), m1bref,tol=1E-5)
+  m1bref <- matrix(c(486.8037, 7.777978, -11.1083,  5.699849, -19.25533, 5.455594, -41.5422,  6.864339,
+                    -21.34052, 17.06059, -11.78236, 12.82083, -26.91253, 7.657342,  9.507693, 2.986006,
+                     25.56825, 2.117479), ncol=2, byrow=TRUE)
+  expect_equal(unname(summary(m1)$coef[,1:2]), m1bref, tol=1E-5)
   
   #test variance
   m1vref <- c(1413.81, 5264.799)
@@ -678,6 +725,9 @@ test_that("PISA tests", {
   # call should disagree, so remove that
   m1$call <- NULL
   m1c$call <- NULL
+  # the cConstructor disagrees
+  m1$lnlf <- NULL
+  m1c$lnlf <- NULL
   expect_equal(m1, m1c, tol=1e-5)
   #test complicated model
   m2 <- mix(pv1math ~ st29q03 + sc14q02 + st04q01 + escs + (1|schoolid) + (0+escs|schoolid), data=data, weights=c("w_fstuwt", "w_fschwt"))
@@ -767,13 +817,6 @@ test_that("examples run", {
   # use vignette example
   library(EdSurvey)
 
-  if(!exists("edsurveyHome")) {
-    if (Sys.info()[['sysname']] == "Windows") {
-      edsurveyHome <- "C:/EdSurveyData/"
-    } else {
-      edsurveyHome <- "~/EdSurveyData/"
-    }
-  }
   #read in data 
   cntl <- readPISA(file.path(edsurveyHome,"PISA/2012"), countries="USA", verbose=FALSE)
   data <- getData(cntl,c("schoolid","pv1math","st29q03","sc14q02","st04q01",
@@ -807,17 +850,26 @@ test_that("examples run", {
 
 })
 
+if(!exists("edsurveyHome")) {
+  if (Sys.info()[['sysname']] == "Windows") {
+    edsurveyHome <- "C:/EdSurveyData/"
+  } else {
+    edsurveyHome <- "~/EdSurveyData/"
+  }
+}
+
 context("Model with top level groups that have entirely 0 columns in Z")
 test_that("Model with top level groups that have entirely 0 columns in Z", {
   skip_on_cran()
   require(EdSurvey)
+  downloadECLS_K(root=edsurveyHome, years=2011)
   ee <- readECLS_K2011(paste0(edsurveyHome, "ECLS_K/2011/"), verbose=FALSE)
   gg <- getData(c("x2rscalk5", "childid", "s2_id", "w1_2p0", "x3sumsh", "p1chldbk","p2freerd"), data=ee, omittedLevels=FALSE, returnJKreplicates=FALSE)
   gg$frpl <- ifelse(gg$p2freerd %in% c("1: FREE LUNCH", "2: REDUCED PRICE LUNCH"), 1, 0)
   gg$w1 <- gg$w1_2p0
   gg$w2 <- 1
   gg$n <- ave(gg$s2_id,gg$s2_id, FUN=length)
-  gg2 <- gg[!is.na(gg$x2rscalk5) & gg$w1>0 & !is.na(gg$p1chldbk) & gg$n > 15 & gg$s2_id < 1200,]
+  gg2 <- gg[!is.na(gg$x2rscalk5) & gg$w1>0 & !is.na(gg$p1chldbk) & gg$n > 15 & gg$s2_id < 1500,]
   m3 <- mix(x2rscalk5 ~ p1chldbk + frpl + (1+frpl|s2_id), data=gg2, weights=c("w1", "w2"), verbose=FALSE)
   # regression tests
   expect_equal(m3$lnl, -1513119.73817376, tol=1e-5)
@@ -840,13 +892,6 @@ test_that("TIMSS tests", {
   skip_on_cran()
   require(EdSurvey)
 
-  if(!exists("edsurveyHome")) {
-    if (Sys.info()[['sysname']] == "Windows") {
-      edsurveyHome <- "C:/EdSurveyData/"
-    } else {
-      edsurveyHome <- "~/EdSurveyData/"
-    }
-  }
   # original version by Christian Kjeldsen
   downloadTIMSS(root=edsurveyHome, years=2015, cache=FALSE, verbose=FALSE)
   dnk15 <- readTIMSS(file.path(edsurveyHome,"/TIMSS/2015"), countries="dnk", gradeLvl=4, verbose=FALSE)

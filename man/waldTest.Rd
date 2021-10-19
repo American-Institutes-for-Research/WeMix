@@ -4,8 +4,7 @@
 \alias{waldTest}
 \title{Mixed Model Wald Tests}
 \usage{
-waldTest(fittedModel, type = c("beta", "Lambda"), coefs = NA,
-  hypothesis = NA)
+waldTest(fittedModel, type = c("beta", "Lambda"), coefs = NA, hypothesis = NA)
 }
 \arguments{
 \item{fittedModel}{a  model of class \code{WeMixResults} that is the result of a call to \code{\link{mix}}}

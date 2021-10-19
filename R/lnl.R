@@ -28,7 +28,7 @@ param.lnl.quad <- function(y, X, levels, Z, ZFull, Qi, QiFull, omega, omegaFull,
                            W, k, qp, cConstructor, bobyqa=FALSE, verbose=TRUE,
                            acc0, mappedDefault=FALSE, family=NULL) {
   function(par, acc=acc0, top=TRUE, integralMultiplierExponent=NULL,
-           integralZColumn=1, mapped=mappedDefault) {
+           integralZColumn=1, mapped=mappedDefault, varFloor=NULL) {
     # par- the random and fixed effects and variance 
     # acc -  numeric, accuracy of the mpfr
     # top - whether the top level (ie overall likelihood rather than group likelihood) is to be returned. 
@@ -44,21 +44,23 @@ param.lnl.quad <- function(y, X, levels, Z, ZFull, Qi, QiFull, omega, omegaFull,
     #
     
     parBeta <- par[1:k]
-    par <- par[ -(1:k)]
+    if(is.null(varFloor)) {
+      par <- par[ -(1:k)]
+    } else {
+      par <- pmax(varFloor, par[ -(1:k)])
+    }
     parC <- cConstructor(par, mapped=mapped)
     yyh0 <- X %*% parBeta
 
-      res <- calc.lin.lnl.quad(y=y, yhat=yyh0, level=levels, Z=Z, ZFull=ZFull,
-                               Qi=Qi, QiFull=QiFull,
-                               omega=omega, omegaFull=omegaFull, W=W,
-                               C=parC, qp = qp, top=top,
-                               verbose=verbose, acc=acc,
-                               integralMultiplierExponent=integralMultiplierExponent,
-                               integralZColumn=integralZColumn,
-                               family=family)
-
-    
-    res
+    res <- calc.lin.lnl.quad(y=y, yhat=yyh0, level=levels, Z=Z, ZFull=ZFull,
+                             Qi=Qi, QiFull=QiFull,
+                             omega=omega, omegaFull=omegaFull, W=W,
+                             C=parC, qp = qp, top=top,
+                             verbose=verbose, acc=acc,
+                             integralMultiplierExponent=integralMultiplierExponent,
+                             integralZColumn=integralZColumn,
+                             family=family)
+    return(res)
   } # ends internal function call - this is what the top level function returns
 }
 
@@ -122,7 +124,7 @@ calc.lin.lnl.quad <- function(y, yhat, level, Z, Qi, omega, W, C, qp,
 
   ### 1) Set up initial values 
   #Bind y to the index present in the lowest level weights 
-  data<-cbind(y,W[[1]])
+  data <- cbind(y, W[[1]])
   
   # grab matrixes for this level 
   # C stands for Covariance.
@@ -140,17 +142,17 @@ calc.lin.lnl.quad <- function(y, yhat, level, Z, Qi, omega, W, C, qp,
   QiFulll <- QiFull[[level]]
   
   # replace aggregate() calls with matrix modification for speed. declaring arrays and matrices 
-  ni_Wl <- table ((Wlm1$indexp1)) 
-  ntot <- length (Wlm1$indexp1)
-  Wl_indices <- unique (Wlm1$indexp1)
-  k_indices = length (Wl_indices)
+  ni_Wl <- table((Wlm1$indexp1)) 
+  ntot <- length(Wlm1$indexp1)
+  Wl_indices <- unique(Wlm1$indexp1)
+  k_indices <- length(Wl_indices)
   # create block diagonal matrix for later multiplication
-  diagM1 <- matrix(0,k_indices,sum(ni_Wl))
-  runtot = 0
+  diagM1 <- matrix(0, k_indices, sum(ni_Wl))
+  runtot <- 0
   # fill block diagonal matrix 
   for (ii in 1:k_indices) { 
-    diagM1[ii,] <- c(rep (0,runtot), rep (1,ni_Wl[ii]), rep (0,ntot - ni_Wl[ii] - runtot)) 
-    runtot = runtot + ni_Wl[ii]
+    diagM1[ii,] <- c(rep(0, runtot), rep(1, ni_Wl[ii]), rep (0, ntot - ni_Wl[ii] - runtot)) 
+    runtot <- runtot + ni_Wl[ii]
   }
   
   ### 2) Create grid of integration points
@@ -185,7 +187,7 @@ calc.lin.lnl.quad <- function(y, yhat, level, Z, Qi, omega, W, C, qp,
   # iterate over grid of integration points over which the likelihood will be evaluated
   for(i in 1:nrow(grd)) {
     # v is the IID N(0,I) vector at this integration point
-    v <- t(grd[i,paste0("v",1:ncol(Zl))])
+    v <- t(grd[i, paste0("v", 1:ncol(Zl))])
    
     # this result is already weighted at the individual level
     if(level == 2) {
@@ -249,7 +251,7 @@ calc.lin.lnl.quad <- function(y, yhat, level, Z, Qi, omega, W, C, qp,
       #the above two lines replicate what was originally done with this line below
       #agg <- aggregate(ll ~ indexp1, Wlm1, sum) 
       colnames(agg) <- c("indexp1", "ll")
-      names(agg)[!names(agg)%in%"indexp1"] <- "lli"
+      names(agg)[!names(agg) %in% "indexp1"] <- "lli"
       
       agg <- merge(agg, aggPrior, by="indexp1")
       # exponetiate to reverse the log manipulations done earlier 

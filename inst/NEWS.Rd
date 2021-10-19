@@ -1,9 +1,59 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
-\section{Changes in version 3.1.5}{
-  \subsection{FIXES}{
+\section{Changes in version 3.1.9}{
+  \subsection{IMPROVEMENTS}{
     \itemize{
+      \item a possible speed up in the solver for linear models uses \code{rbind2} in preference to \code{rbind}
+      \item The error code when a single weight was passed was unclear. Thank you to Zerleen Quader for identifying this issue.
+    }
+  }
+}
+
+\section{Changes in version 3.1.8}{
+  \subsection{BUG FIXES}{
+    \itemize{
+      \item \code{mix} now works with factor outcomes in a binomial model.
+      \item \code{mix} now works with factor IDs.
+      \item the final latent estimates were not converging because the Newton steps were not sufficently controlled. They are now more agressively prevented from diverging.
+      \item when the variance estimate of a binomial model converged to the minimum variable (about 0.01) the model never acknowledged convergence, it now does.
+      \item thanks to Tan Khai Ee and Prof. Taberez A. Neyazi for identifying and helping develop test code for the above four bugs.
+      \item non-linear models summary function was not printing correctly. They are now also correctly showing weighted results, similar to linear models in 3.1.7.
+      \item the warning for very low variance models in binomial regression was updated to clearly state the limitation of WeMix (it cannot estimate such models), and possible solutions.
+    }
+  }
+}
+
+
+\section{Changes in version 3.1.7}{
+  \subsection{IMPROVEMENTS}{
+    \itemize{
+      \item with the extended information in \code{Groups} the warning about conditional weights was extranious and so was removed.
+    }
+  }
+}
+
+\section{Changes in version 3.1.7}{
+  \subsection{IMPROVEMENTS}{
+    \itemize{
+      \item improved infomation about weights by level under \code{Groups} header of an \code{mml} summary.
+      \item a conditioning variable cannot contain a dot, which now has a clearer error. Thank you to Felix Schulz for identifying this issue.
+    }
+  }
+}
+
+\section{Changes in version 3.1.6}{
+  \subsection{IMPROVEMENTS}{
+    \itemize{
+      \item it is possible to pass an S3 object that claims to extend data frame but does not (such as a \code{tbl_df}) and so now all data objects are cast as a data frame before procesing beings. The specific issue is that a \code{tbl_df} defaults to \code{drop=FALSE} causing a single vector to maintain its name when it is expected to be unnamed.
+    }
+  }
+}
+
+\section{Changes in version 3.1.5}{
+  \subsection{IMPROVEMENTS}{
+    \itemize{
+      \item Models now use less memory when there is a large number of units and groups after switching to a sparse Matrix for the random effects.
       \item The method of forming a generalized inverse was made more robust. It used to try only a QR decomposition based generalized inverse; this is now lest robust for unknown reasons. Now it also tries an SVD decomposition based generalized inverse.
       \item Updated tests to use EdSurvey 2.6.1.
     }

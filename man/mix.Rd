@@ -4,10 +4,23 @@
 \alias{mix}
 \title{Survey Weighted Mixed-Effects Models}
 \usage{
-mix(formula, data, weights, cWeights = FALSE, center_group = NULL,
-  center_grand = NULL, max_iteration = 10, nQuad = 13L, run = TRUE,
-  verbose = FALSE, acc0 = 120, keepAdapting = FALSE, start = NULL,
-  fast = FALSE, family = NULL)
+mix(
+  formula,
+  data,
+  weights,
+  cWeights = FALSE,
+  center_group = NULL,
+  center_grand = NULL,
+  max_iteration = 10,
+  nQuad = 13L,
+  run = TRUE,
+  verbose = FALSE,
+  acc0 = 120,
+  keepAdapting = FALSE,
+  start = NULL,
+  fast = FALSE,
+  family = NULL
+)
 }
 \arguments{
 \item{formula}{a formula object in the style of \code{lme4} that creates the model.}
@@ -72,6 +85,7 @@ This is a list with elements:
 \item{varVC}{the variance-covariance matrix of the random effects.}
 \item{cov_mat}{the variance-covariance matrix of the fixed effects.}
 \item{var_theta}{the variance covariance matrix of the theta terms.}
+\item{wgtStats}{statistics regarding weights, by level.}
 }
 \description{
 Implements a survey weighted mixed-effects model using the provided formula.

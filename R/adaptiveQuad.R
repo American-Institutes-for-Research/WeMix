@@ -50,7 +50,7 @@
 #' @importFrom stats dnorm aggregate terms dpois dgamma dbinom ave model.matrix terms.formula as.formula sigma complete.cases
 #' @importFrom numDeriv genD hessian grad
 #' @importFrom minqa bobyqa 
-#' @importFrom Matrix nearPD
+#' @importFrom Matrix nearPD sparse.model.matrix
 #' @return object of class \code{WeMixResults}. 
 #' This is a list with elements: 
 #' \item{lnlf}{function, the likelihood function.} 
@@ -73,6 +73,7 @@
 #' \item{varVC}{the variance-covariance matrix of the random effects.}
 #' \item{cov_mat}{the variance-covariance matrix of the fixed effects.}
 #' \item{var_theta}{the variance covariance matrix of the theta terms.}
+#' \item{wgtStats}{statistics regarding weights, by level.}
 #' @example \man\examples\mix.R
 #' @author Paul Bailey, Claire Kelley, and Trang Nguyen 
 #' @export
@@ -95,6 +96,9 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # check class and some requirements of arguments
   if(!inherits(formula, "formula")) stop(paste0("The argument ", sQuote("formula"), " must be a formula."))
   if(!inherits(data, "data.frame")) stop(paste0("The argument ", sQuote("data"), " must be a data.frame."))  
+  if(length(class(data)) > 1) { 
+    data <- as.data.frame(data)
+  }
   if(nQuad <= 0) stop(paste0("The argument ", sQuote("nQuad"), " must be a positive integer."))
   if(!inherits(run, "logical")) stop(paste0("The argument ", sQuote("run"), " must be a logical."))
   if(!inherits(verbose, "logical")) stop(paste0("The argument ", sQuote("verbose"), " must be a logical."))
@@ -102,23 +106,33 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(any(!weights %in% colnames(data))) stop(paste0("The argument ", sQuote("weights"), " must specify valid columns in ", sQuote("data"), "."))
   if(acc0 <= 0) stop(paste0("The argument ", sQuote("acc0"), " must be a positive integer."))
   if(!missing(fast)) warning(paste0("The ", sQuote("fast"), " argument is deprecated."))
-  
+  if(any(grepl("[|].*[.]",attributes(terms(formula))$term.labels))) stop("The formula is not valid for mix. The name of conditioning variables must not contain a dot. Try renaming variables after | in the fomrula so they do not contain a dot.")
   #currently wemix can only use complete cases
   #this removes any  incomplete cases if they exist 
-  if(any(is.na(data[,c(all.vars(formula),weights)]))) {
+  if(any(is.na(data[ , c(all.vars(formula), weights)]))) {
     warning(paste0("There were ", sum(complete.cases(data)==FALSE), " rows with missing data. These have been removed."))
-    data <- data[complete.cases(data),]
+    data <- data[complete.cases(data), ]
+  }
+  if(length(weights) == 1) {
+    # if the length of weights is 1 then below subsets on weights do not work.
+    stop(paste0("The argument ", sQuote("weights"), " must be a list of column names with length equal to levels."))
   }
   #this removes any zero weight cases if they exist 
-  data[apply(data[,weights]<=0, 1, any), weights] <- NA
-  if(any(is.na(data[,weights]))) {
+  data[apply(data[ , weights] <= 0, 1, any), weights] <- NA
+  if(any(is.na(data[ , weights]))) {
     warning(paste0("There were ", sum(complete.cases(data)==FALSE), " rows with non-positive weights. These have been removed."))
-    data <- data[complete.cases(data),]
+    data <- data[complete.cases(data), ]
   }
   
   # setup family
   # if family is set, use it
   if(!is.null(family)) {
+    if(inherits(family, "character")) {
+      family <- do.call(family, args=list())
+    }
+    if(!inherits(family, "family")) {
+      stop(paste0("The family argument must be of class ", dQuote("family"), "."))
+    }
     family$lnl <- switch(family$family,
       binomial = function(y, mu, w, sd) {
                    w * dbinom(x=y, size=rep(1,length(y)), prob=mu, log=TRUE)
@@ -156,21 +170,21 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # a function to parse group names
   groupParser <- function(groupi) {
     # have base::all.vars parse the group name
-    all.vars(formula(paste0("~",groupi)))
+    all.vars(formula(paste0("~", groupi)))
   }
   
   # apply the parser to each random effect, and unique them
   groupNames <- rev(unique(unlist(lapply(unparsedGroupNames, groupParser))))
   # reorder data by groups (in order to make Z matrix obtained from lme easier to work with)
-  data <- data[do.call(order, lapply(rev(groupNames), function(colN) data[,colN])),]
+  data <- data[do.call(order, lapply(rev(groupNames), function(colN) data[ , colN])), ]
   
   if(!is.null(center_group)) {
     #first add nested variables to data set if they exist, this is to handle / and : in group vars
-    if (any(grep(":|/",names(center_group)))) {
-      nested_groups <- names(center_group)[grep(":|/",names(center_group))]
+    if (any(grep(":|/", names(center_group)))) {
+      nested_groups <- names(center_group)[grep(":|/", names(center_group))]
       for (var in nested_groups){
-         vars <- unlist(strsplit(var,":|/"))
-         data[,var] <- paste0(data[,vars[1]],":",data[,vars[2]])
+        vars <- unlist(strsplit(var , ":|/"))
+        data[,var] <- paste0(data[ , vars[1]], ":", data[ , vars[2]])
       }
     } #end of if there are : and / 
     if(!all(names(center_group) %in% names(data))){
@@ -183,25 +197,31 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
 
         # identify level--it is the minimum group to account for : and / specified groups
         lev <- min(which(groupNames %in% unlist(strsplit(name,":|/"))))
-
-        X <- model.matrix(center_group[[name]],data=data)
+        X <- sparse.model.matrix(center_group[[name]],data=data)
         vars <- colnames(X)[-1]
-        X <- cbind(X,data[,c(name,weights0[lev])])
-        
+        X <- cbind(X, data[ , weights0[lev]])
+        colnames(X)[ncol(X)] <- weights0[lev]
         # subtract group average from value and put back into data 
         # including scaling factor that accoutns for the fact weights might not sum to 0 l
-        data[,vars] <- sapply(vars, function(var){X[,var] - ave(X[,var]*X[,weights0[lev]],X[,name])/(nrow(X)/sum(X[,weights0[lev]]))})
+        data[ , vars] <- sapply(vars, function(var){
+                           X[ , var] - 
+                             ave(X[ , var] * X[ , weights0[lev]], data[ , name])/
+                             (nrow(X)/sum(X[ , weights0[lev]]))
+                         })
+        # only used for centering
+        rm(X)
       } # end for(name in names(center_group))
     } # end else for loop mean centering varibles 
   } # end if(!is.null(center_group))
-  
    
   if(!is.null(center_grand)){
-    X <- model.matrix(center_grand,data=data)
+    X <- sparse.model.matrix(center_grand, data=data)
     vars <- colnames(X)[-1]
     
     #subtract overall avvrage from value and put back into X 
-    data[,vars] <- sapply(vars, function(var){X[,var] - ave(X[,var])})
+    data[ , vars] <- sapply(vars, function(var){X[ , var] - ave(X[ , var])})
+    # only used for centering
+    rm(X)
   }
 
   # remove row names so that resorted order is used in lme model 
@@ -220,6 +240,18 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     }
     lme <- glmer(formula, data, family=family)
   }
+  # get y, test for validity
+  mf <- model.frame(lme)
+  responseCol <- attributes(attributes(mf)$terms)$response
+  y <- as.numeric(mf[ , responseCol])
+  if(!is.null(family) && family$family == "binomial") {
+    if(length(unique(y)) == 2) {
+      y <- ifelse(y == min(y), 0, 1)
+    }
+    if(any(!y %in% c(0,1))) {
+      stop("For a binomial model the outcomes must be 0 or 1.")
+    }
+  }
   # Get the Z (random effects) matrix from LME 
   model_matrix <- getME(lme,"mmList")
   
@@ -230,20 +262,10 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   groupNames <- all_groups  
   
   # store the full sample weights (or cWeights) in wgts0
-  wgts0 <- data[,weights]
+  wgts0 <- data[ , weights]
   if(cWeights) {
     for(i in (ncol(wgts0)-1):1) {
-      wgts0[,i] <- wgts0[,i] * wgts0[,i+1]
-    }
-  } else {
-    cwarn <- FALSE
-    for(i in (ncol(wgts0)-1):1) {
-      if(any(wgts0[,i] < wgts0[,i+1])) {
-        cwarn <- TRUE
-      }
-    }
-    if(cwarn) {
-      message(paste0("Some weights are larger at higher levels. This could be the result of scaling. However, if the weights are conditional, consider setting ",dQuote("cWeights=TRUE"), "."))
+      wgts0[ , i] <- wgts0[ , i] * wgts0[ , i+1]
     }
   }
   # check if weights are potentially conditional
@@ -251,22 +273,40 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # create columns for any interactions coming from the formula
   # this will be mainly used in 3 level models and is included for forward compatability 
   missingGroupVars <- all_groups[!all_groups %in% names(data)] #find which group names are not in data set (ie composite groups)
-   
+
+  # drop levels of factors in present vars
+  presentVars <- all_groups[all_groups %in% names(data)]
+  for(i in seq_along(presentVars)) {
+    if(inherits(data[, presentVars[i]], "factor")) {
+      data[, presentVars[i]] <- droplevels(data[, presentVars[i]])
+    }
+  }
+
   # the lowest level, assumed to be the grouping var,
   # but updated when not in "if (length(missingGroupVars)>0){" loop
   all_groups_lowest_level <- all_groups
 
-  if (length(missingGroupVars)>0){
-    # for each missing group var
-    for(mgi in 1:length(missingGroupVars)) {
-      #transform interactions into thier componenet parts
-      vars <- rownames(attr(terms.formula(as.formula(paste(". ~",paste(missingGroupVars[mgi],collapse="+"))) ), "factors"))[-1]
-      data[,missingGroupVars[mgi]] <- apply(data[,vars],1,function(x) {paste(x,collapse=":")}) 
-      # this is a composite term, use the final 
-      all_groups_lowest_level[mgi] <- vars[1]
+  # for each missing group var
+  for(mgi in seq_along(missingGroupVars)) {
+    #transform interactions into thier componenet parts
+    vars <- rownames(attr(terms.formula(as.formula(paste(". ~", paste(missingGroupVars[mgi], collapse="+"))) ), "factors"))[-1]
+    # drop levels on vars in missing groups
+    for(i in seq_along(vars)) {
+      if(inherits(data[, vars[i]], "factor")) {
+        data[, vars[i]] <- droplevels(data[, vars[i]])
+      }
     }
+    data[ , missingGroupVars[mgi]] <- apply(data[ , vars], 1, function(x) {
+                                        paste(x, collapse=":")
+                                      }) 
+    # this is a composite term, use the final 
+    vtab <- lapply(vars, function(x) {
+              tab <- table(data[ , x])
+              sum(tab>0)
+            })
+    all_groups_lowest_level[all_groups_lowest_level == all_groups[mgi]] <- vars[which.max(unlist(vtab))]
   }
-  
+
   # prepare Z matrices for each level 
   Z <- list(NULL)
   # Z is de-duplicated. ZFull is always the size of the outcome vector
@@ -274,11 +314,11 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   ZFull <- list(NULL)
   n_rows <- nrow(data)
   for (i in 1:length(all_groups)){
-    z_to_merge <- grepl(paste0("[|]\\W",all_groups[i],"$"), z_groups)
+    z_to_merge <- grepl(paste0("[|]\\W", all_groups[i], "$"), z_groups)
     Z_i <- matrix( unlist(model_matrix[z_to_merge], use.names=FALSE), nrow=n_rows)
     ZFull <- c(ZFull, list(Z_i))
     if(i > 1) {
-      Z_i <- Z_i[!duplicated(data[,all_groups[i-1]]),,drop=FALSE]
+      Z_i <- Z_i[!duplicated(data[ , all_groups[i-1]]), , drop=FALSE]
     }
     Z <- c(Z, list(Z_i))
   }
@@ -293,7 +333,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   
   #calculate n levels from Z and warn if not the same dimension as weights 
   levels <- length(Z)
-  
   if(length(weights) != levels) {
     stop(paste0("The argument ", sQuote("weights"), " must be a list of column names with length equal to levels."))  
   }
@@ -302,14 +341,14 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # columns representing unit weight at that level and index of group names 
   weights <- list()
   for(i in 1:length(nz)) {
-    df <- data.frame(w=wgts0[,i],stringsAsFactors=FALSE)
+    df <- data.frame(w=unname(wgts0[ , i]), stringsAsFactors=FALSE)
     # add the index for this level, when there is one
     if(i < length(nz)) {
-      df$indexp1 <- data[,all_groups[i]]
+      df$indexp1 <- data[ , all_groups[i]]
     }
     if(i > 1) {
       # for levels >1 data frame indexed by group name and values represent weights 
-      df$index <- data[,all_groups[i-1]]
+      df$index <- data[ , all_groups[i-1]]
       # return 0 var if there is only one unit
       rvar <- function(x) {
         if(length(x) <=1) {
@@ -322,7 +361,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       if(any(agg$w > sqrt(.Machine$double.eps))) {
         stop(paste0("Some level-", i+1, " weights vary within group."))
       }
-      df <- df[!duplicated(df$index),]
+      df <- df[!duplicated(df$index), ]
     }
     weights[[i]] <- df
   }
@@ -340,6 +379,9 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     # then there will be non unique entries in ngrp 
     stop("This does not appear to be a nested model. Some levels of this model have the same number of subject/groups as the level above them.")
   }
+  ngrpW <- lapply(weights, function(wdf) {
+    return(list(mean=mean(wdf$w), sum=sum(wdf$w), min=min(wdf$w), max=max(wdf$w))) 
+  })
 
   # set up variance and coefficients 
   lmeVarDF <- data.frame(lmesummary$varcor)
@@ -389,15 +431,14 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   names(est0)[-(1:k)] <- lmeVarDF$grp
   
   #add full variable name to lmeVarDF for later use 
-  lmeVarDF$fullGroup <- paste0(lmeVarDF$grp,ifelse(!is.na(lmeVarDF$var1),paste0(".",lmeVarDF$var1),""))
+  lmeVarDF$fullGroup <- paste0(lmeVarDF$grp, ifelse(!is.na(lmeVarDF$var1), paste0(".", lmeVarDF$var1), ""))
 
   # use helper funtion to create a covariance matrix from the data frame with variance and covariance information
   covarianceConstructor <- covMat2Cov(lmeVarDF)
+
   # C is the realization of the covariance constructor
   C <- covarianceConstructor(est0[-(1:k)])
-  
   # these are the realized y/X vector/matrix
-  y <- as.numeric(eval(formula[[2]],data))
   X <- getME(lme, "X")
   
   ##############################################################
@@ -413,7 +454,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     Zlist <- list()
     for (i in 2:levels){
       z_names <- z_levels[z_levels$level==i,"fullGroup"]
-      Zlist[[i-1]] <-t(as.matrix((Reduce(rbind,temp_Z[z_names]))))
+      Zlist[[i-1]] <- Matrix::t(do.call(rbind, temp_Z[z_names]))
+      #Zlist[[i-1]] <- t(as.matrix((Reduce(rbind, temp_Z[z_names]))))
     }
     #seperating into single random effects using the pointers
     pointers <- getME(lme, "Gp")
@@ -589,7 +631,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     # other output stats
     nobs <- nrow(X)
     names(nobs) <- "Number of obs"
-    ngroups <- c(nobs,ngrp)
+    ngroups <- c(nobs, ngrp)
 
     #Calculate ICC 
     var_between <- sum(varDF[which(!is.na(varDF$var1) & is.na(varDF$var2)),"vcov"])
@@ -614,11 +656,11 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
                levels=levels, CMODE=bhatq$ranef,
                invHessian=bhatq$cov_mat, ICC=ICC,
                is_adaptive=FALSE, sigma=bhatq$sigma, cov_mat=bhatq$varBetaRobust,
-               ngroups=ngroups, varDF=varDF, varVC=varVC,var_theta=var_of_var)
+               ngroups=ngroups, varDF=varDF, varVC=varVC,var_theta=var_of_var,
+               wgtStats=ngrpW)
     class(res) <- "WeMixResults"
     return(res)
   }
-  
   
   ##############################################################
   # 2b) Identify integration parameter for non linear models  #
@@ -633,7 +675,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # Note: MAP finds the maximum of the likelihood surface.
   # it is not, properly, a MAP
 
-  MAP0 <- MAP(groups=data[,all_groups,drop=FALSE], y=y, X=X, levels=levels,
+  MAP0 <- MAP(groups=data[ , all_groups, drop=FALSE], y=y, X=X, levels=levels,
               Z=Z, ZFull=ZFull, weights=weights, k=k,
               qp=gauss.quad(nQuad, "hermite"),
               covariance_constructor=covarianceConstructor, verbose=verbose,
@@ -716,7 +758,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # fn0 does not use this map and can be easily used by the user
   # fn0R does use that map and is intended for use by the optimizer
   # these calls are otherwise identical.
-
   fn0 <- param.lnl.quad(y=y,
                         X=X,
                         levels=levels,
@@ -762,7 +803,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #############################################
   
   d1 <- rep(Inf, length(est)) #d1 represent first derivatives of estimates 
-  oldlnl <- fn0(est) # evaluate the likelihood with the estimated coefficients before adaptive quadrature 
+  oldlnl <- fn0(est, varFloor=-3.59) # evaluate the likelihood with the estimated coefficients before adaptive quadrature 
   
   a00 <- a0 # start from previous estimates (MAP estimates) 
     
@@ -788,12 +829,18 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   stepIndQueue <- list()
   dd1 <- d1
   dd2 <- outer(dd1,dd1) 
-  iteration <- 1
-  while(max(abs(dd1[c(1:k,not_0_vars)]/pmax(abs(est[c(1:k,not_0_vars)]),1e-5))) > 1E-5) { 
+  iteration <- 0
+  varFloorBinding <- FALSE
+  oldest <- est
+
+  # first condition, a variance is 0.01, so we look just for fitted values to not change
+  # second condition, look for derivatives to be small
+  while(all(iteration < max_iteration,
+            any(varFloorBinding & max(est - oldest) > 1e-5 ,
+               !varFloorBinding & max(abs(dd1[c(1:k, not_0_vars)]/pmax(abs(est[c(1:k, not_0_vars)]), 1e-5))) > 1E-5)
+                               )) { 
     iteration <- iteration + 1
-    if (iteration > max_iteration){
-      stop("Model exceeded maximum number of iterations without converging.")
-    }
+    oldest <- est
     if(length(stepIndQueue)==0) {
       stepIndQueue <- defStepsInds
     }
@@ -813,21 +860,22 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     v <- rep(0, length(est0))
     v[thisStepInds] <- solve(d2) %*% d1 # the Newton step
     if(verbose) {
-      cat("lnl:",oldlnl, " max (relative) derivative=", max(abs(dd1[c(1:k,not_0_vars)]/pmax(abs(est[c(1:k,not_0_vars)]),1e-5))), " ")
+      cat("step:", iteration, "/", max_iteration, "\n")
+      cat("lnl:", oldlnl, " max (relative) derivative=", max(abs(dd1[c(1:k,not_0_vars)]/pmax(abs(est[c(1:k,not_0_vars)]), 1e-5))), " ")
       cat("\nCurrent solution, gradient, and Newton step:\n")
-      prnt <- cbind(oldEstimate=est, firstDeriv=dd1, proposedNewtonEstimate= est - v)
-      rownames(prnt) <- names(est0)
+      prnt <- cbind(oldEstimate=est, firstDeriv=dd1, proposedNewtonEstimate=est - v)
+      rownames(prnt) <- c(names(est0)[1:k], paste0("ln var ", names(est0)[-(1:k)], ""))
       colnames(prnt) <- c("previous Est", "firstDeriv", "Newton Step")
       print(prnt)
     }
     
     # create new estimate by stepping in the direction idicated by gradient and scaled by fact
     newest <- est - fact * v
-    newlnl <- fn0(newest)
+    newlnl <- fn0(newest, varFloor=-3.59)
     stp <- 0
     
     # make sure Newton step is a step improves lnl
-    while(newlnl <= oldlnl) {
+    while(newlnl < oldlnl) {
       stp <- stp + 1
       if(verbose) {
         cat("Halving step size.\n")
@@ -847,7 +895,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
         oldlnl <- oldlnl - 1
       }
       newest <- est - fact * v
-      newlnl <- fn0(newest)      
+      newlnl <- fn0(newest, varFloor=-3.59)      
     } # end while(newlnl < oldlnl)
     if(verbose) {
       cat("\n")
@@ -858,9 +906,10 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     oldlnl <- newlnl
 
     # now, worry about threshold
-    if(sum(est[-(1:k)]< -3.59) > 0) {
-      est[-(1:k)]  <- ifelse(est[-(1:k)]< -3.59,-3.59,est[-(1:k)])  #reset variance that get below threshold
-      oldlnl <- fn0(est)      
+    if(any(est[-(1:k)] < -3.59)) {
+      est[-(1:k)]  <- ifelse(est[-(1:k)] < -3.59, -3.59, est[-(1:k)])  #reset variance that get below threshold
+      varFloorBinding <- TRUE
+      # no need up update oldlnl, this varFloor is always enforced
     }
     #adapts new quadrature points if parameter keepAdapting is true  
     if(keepAdapting) {
@@ -951,7 +1000,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       a00 <- a0
       # the lnl function may have shifted enough that we need to update the current lnl
       # so update it based on these new quad points
-      oldlnl <- fn0(est)
+      oldlnl <- fn0(est, varFloor=-3.59)
     } # end if(keepAdapting)
     #end of the Newton's method while loop
     
@@ -965,7 +1014,12 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       skipNextHessian <- FALSE
     }
   } # end of while(max(abs(d1/pmax(abs(est),1e-5))) > 1E-5)
-
+  if(verbose) {
+    message("Itterations complete.")
+  }
+  if (iteration >= max_iteration){
+    #warning("Model exceeded maximum number of iterations and may not have converged.")
+  }
   #############################################
   #            4) Post Estimation             #
   #############################################
@@ -975,7 +1029,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # For each "random effect" calculate the maximum of the likelihood surface (MAP)
   # and the expected value of the likelihood surface (BLUE)
   MAP <- MAP0(omega0=a0$omega0, par0=est, verb=FALSE)$omega0
-  BLUE <- BLUE0(omega0=a0$omega0, par0=est,Qi0=a0$Qi0,adapt=FALSE,verb=FALSE)
+  BLUE <- BLUE0(omega0=a0$omega0, par0=est, Qi0=a0$Qi0, adapt=FALSE, verb=FALSE)
   
   # make est numeric
   est <- as.numeric(est)
@@ -989,15 +1043,21 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   need_fix_vars <- which(vars < 1)
   covs_and_vars[need_fix_vars] <- exp(covs_and_vars[need_fix_vars] - 1)
   
-  #if any of variances  got re mapped, re calculate hessian with new position 
+  # get vars and name them
+  vars <- covs_and_vars
+  names(vars) <- gsub(":NA", "", paste(lmeVarDF$grp, lmeVarDF$var1, lmeVarDF$var2, sep=":"))
+
+  # If any of variances got re mapped, re calculate hessian just inside the line, and 
+  # share the limitation on WeMix estimation and the model wit the user.
   if (length(need_fix_vars) > 0){
-    hessian <- getHessian(fn0R,c(est[1:k],covs_and_vars))
+    warning(paste0("Group variances too small to estimate accurately. The estimated variance in the group level terms(s) ", paste(dQuote(names(vars)[need_fix_vars]), collapse=", "), " is near zero.",
+                   " Very low variance suggests that the data is not hierarchical and that a model without these levels should be considered.",
+                   " If this removes all groups then a non-hierarchical model, such as logistic regression, should be considered."))
+    # calculate hessian, moving covariances to just larger values so the Hessian is internal
+    hessian <- getHessian(fn0R, c(est[1:k], covs_and_vars+0.0002*need_fix_vars))
   }
 
   #calculate interclass corelation (ICC) 
-  vars <- covs_and_vars
-  names(vars) <- gsub(":NA","",paste(lmeVarDF$grp,lmeVarDF$var1,lmeVarDF$var2,sep=":"))
-
   var_between <- sum(vars[which(!is.na(lmeVarDF$var1) & is.na(lmeVarDF$var2))])
   var_within <- vars[which(lmeVarDF$grp=="Residual")]
   ICC <- var_between/(var_between+var_within)
@@ -1005,7 +1065,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # it is possible for the lnl to have changed slightly, so update it to avoid confusion
   nobs <- nrow(X)
   names(nobs) <- "Number of obs"
-  ngroups <- c(nobs,ngrp)
+  ngroups <- c(nobs, ngrp)
   
   #set up the variance covariance matrix 
   varDF <- lmeVarDF[,c("grp", "var1", "var2", "vcov", "ngrp", "level")]
@@ -1015,9 +1075,10 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   
   varDF$vcov <- vars #re assign in variance from mix.  This works without formatting because only 2 level models are posisble
   
-  res <- list(lnlf=fn0R, lnl=fn0(est), coef=est[1:k], vars=vars,
+  res <- list(lnlf=fn0R, lnl=fn0(est, varFloor=-3.59), coef=est[1:k], vars=vars,
               call=call, levels=levels, ICC=ICC, CMODE=BLUE,
-              invHessian=hessian, is_adaptive=TRUE, ngroups=ngroups, varDF=varDF)
+              invHessian=hessian, is_adaptive=TRUE, ngroups=ngroups, varDF=varDF,
+              wgtStats=ngrpW)
   class(res) <- "WeMixResults"
   return(res)
 }
@@ -1094,7 +1155,7 @@ BLUE <- function(groups, y, X, levels, Z, ZFull, weights0, k, qp,
       omg1 <- 2*omg0  #increment up to allow while loop to run
        
       # keep looking for the mean
-      while( max(abs( (omg1 - omg0) / pmax(abs(omg0),1E-5))) > 1E-3) {
+      while( max(abs( (omg1 - omg0) / pmax(abs(omg0), 1E-5))) > 1E-3) {
         omg1 <- omg0
         tmpomega_ <- c(tmpomega, list(omg0))
         nzi <- ncol(Z[[oi]]) # number of Z columns at olvl
@@ -1106,7 +1167,7 @@ BLUE <- function(groups, y, X, levels, Z, ZFull, weights0, k, qp,
           f0 <- f(par0, top=FALSE, integralMultiplierExponent=0, integralZColumn=ici)
           f1 <- f(par0, top=FALSE, integralMultiplierExponent=1, integralZColumn=ici)
           # f1 is not logged, f0 is
-          omg0[,ici] <- as.numeric(f1/f0)
+          omg0[ , ici] <- as.numeric(f1/f0)
         }
         # make omega
         omega0p <- c(tmpomega, list(omg0))
@@ -1192,13 +1253,17 @@ MAP <- function(groups, y, X, levels, Z, ZFull, weights, k, qp,
     QiFull <- list(NULL)
     tmpomega <- list(NULL)
     tmpomegaFull <- list(NULL)
+    u0 <- 0
     for(oi in 2:length(omega0)) {
       # Over all levels >1 
       omg0 <- omega0[[oi]]
       omg1 <- 1E20*(omg0+1E-15)
       nzi <- nz[[oi]]
-      iter <- 1
-      while( iter < 25 & max(abs( (omg1 - omg0) / pmax(abs(omg0),1E-5))) > 1E-3) { # iterate while Omega continues to change more than threshold
+      iter <- 0
+      while( iter < 25 & max(abs( (omg1 - omg0) / pmax(abs(omg0), 1E-5))) > 1E-3) { # iterate while Omega continues to change more than threshold
+        if(iter >= 1) {
+          u0 <- max(c(u0, as.vector(abs( (omg1 - omg0) ))))
+        }
         iter <- iter + 1
         omg1 <- omg0
         tmpomega_ <- c(tmpomega, list(omg0))
@@ -1208,8 +1273,8 @@ MAP <- function(groups, y, X, levels, Z, ZFull, weights, k, qp,
                           tmpomega_, par0, verb, Qi, QiFull, oi, acc,
                           family)
         # this is just second derivatives
-        d1 <- getJacobian(ofn, rep(0,nz[[oi]], na.rm=TRUE), m=nrow(omg0))
-        d2w <- d2 <- getHessian(ofn, rep(0,nz[[oi]], na.rm=TRUE))
+        d1 <- getJacobian(ofn, rep(0, nz[[oi]], na.rm=TRUE), m=nrow(omg0))
+        d2 <- getHessian(ofn, rep(0, nz[[oi]], na.rm=TRUE))
         
         ######################################
         #        2) MAP estimate            #
@@ -1218,7 +1283,25 @@ MAP <- function(groups, y, X, levels, Z, ZFull, weights, k, qp,
         # this is the Newton step, per group
         omg0 <- lapply(1:length(d2),
                        function(i) {
-                         omg0[i,] - 0.5 * solve(d2w[[i]]) %*% d1[[i]]
+                         step <- solve(d2[[i]]) %*% d1[[i]]
+                         if(iter >= 3) {
+                           # first, nudge down to 1/2 step for everything
+                           step <- 1/2 * step
+                           # contract to no larger than the initial step
+                           # slowly moving that max down as iteration number increases
+                           ii <- 1
+                           while(any(abs(step) > 3*u0/iter)) {
+                             ii <- ii + 1
+                             step <- 1/2 * step
+                             if(ii > 20) {
+                              stop("Ridiculous Newton step proposed, MAP not converging.")
+                             }
+                           }
+                         } else {
+                           # contract just a bit
+                           step <- 1/2 * step
+                         }
+                         omg0[i,] - step
                        })
         
         # this recudes that to a vector
@@ -1400,7 +1483,7 @@ adapterLnL <- function(y, X, levels, Z, ZFull, weights, k, qp,
       mvnpdfC(as.matrix(p), rep(0, length = length(p)), varcovM=Cl%*%t(Cl), Log=TRUE)
                         })
     if(long) {
-      return(list(res=loglikelihoodByGroup+posteriorByGroup,
+      return(list(res=loglikelihoodByGroup + posteriorByGroup,
                   loglikelihoodByGroup=loglikelihoodByGroup,
                   posteriorByGroup=posteriorByGroup))
     }

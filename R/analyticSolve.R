@@ -11,7 +11,7 @@
 # @param groupID a matrix containing the group ids for each level in the model. 
 # @param lmeVardf a dataframe containing the variances and covariance of the random effects, in the same format as returned from lme. 
 #' @importFrom Matrix Diagonal Matrix bdiag diag
-#' @importFrom methods as .hasSlot
+#' @importFrom methods as .hasSlot rbind2 
 analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, groupID, lmeVarDF, analyticJacobian=FALSE, forcebaseQR=FALSE, qr_=qr_0, v0, lndetLz0=NULL) {
 
   if(!inherits(groupID, "matrix")) {
@@ -277,7 +277,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
     if(lndetLz0u) {
       # only evaluate all of this if we do not already have an lnldetZ value
       for(level in 1:ncol(groupID)) {
-        groups <- unique(groupID[,level])
+        groups <- unique(groupID[ , level])
         Deltai <- Delta[[level+1]]
         sDeltai0 <- as(Delta[[level+1]], "sparseMatrix")
         # R11 notation from Bates and Pinheiro, 1998
@@ -285,11 +285,11 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
         topLevel <- level == ncol(groupID)
         for(gi in 1:length(groups)) {
           if(level == 1 || level < ncol(groupID)) {
-            # this may work for 3 level, will need to consider selection by row for >3 
-            Zrows <- groupID[,level]==groups[gi]
             # get Zi
             ZiA <- ZiAl[[gi]]
             if(!topLevel) {
+              # this may work for 3 level, will need to consider selection by row for >3 
+              Zrows <- groupID[ , level] == groups[gi]
               lp1 <- unique(groupID[Zrows,level+1])
               qp1 <- nrow(Delta[[level+2]])
             }
@@ -299,23 +299,23 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
             #Delta0 <- sparseMatrix(i=integer(0), j=integer(0), dims=c(qi, ncol(ZiA)-ncol(Deltai)))
             #ZiA <- rbind(ZiA, cbind(Deltai, Delta0))
             # expand sDeltai as if we rbinded, much faster
-            sDeltai <- sDeltai0          
+            sDeltai <- sDeltai0
             if(ncol(ZiA) < ncol(sDeltai)) {
               ZiA <- cbind(ZiA, matrix(0, nrow=nrow(ZiA), ncol=ncol(sDeltai) - ncol(ZiA)))
             } else {
-              sDeltai@Dim <- c(sDeltai@Dim[1], sDeltai@Dim[2] + ncol(ZiA)-ncol(Deltai))
+              sDeltai@Dim <- c(sDeltai@Dim[1], sDeltai@Dim[2] + ncol(ZiA) - ncol(Deltai))
               sDeltai@Dimnames[[2]] <- rep("", sDeltai@Dim[2])
-              sDeltai@p <- c(sDeltai@p, rep(max(sDeltai@p),ncol(ZiA)-ncol(Deltai)))
+              sDeltai@p <- c(sDeltai@p, rep(max(sDeltai@p), ncol(ZiA) - ncol(Deltai)))
             }
-
-            ZiA <- rbind(ZiA, sDeltai)
+            # rbind manually, used to do this:
+            ZiA <- rbind2(ZiA, sDeltai)
             # in this section we decompose Zi * A using qr decomposition,
             # following equation 43 in the vingette.
             ZiAR <- qr_qrr(ZiA) # this is faster than getchr(ZiA)
             R22 <- ZiAR[1:qi, 1:qi, drop=FALSE]
-            lndetLzi <- weights[[level+1]][gi]*(- as.numeric(determinant(Deltai)$mod) + sum(log(abs(Matrix::diag(R22)[1:ncol(Deltai)])))) # equation (92)
+            lndetLzi <- weights[[level+1]][gi] * (- as.numeric(determinant(Deltai)$mod) + sum(log(abs(Matrix::diag(R22)[1:ncol(Deltai)])))) # equation (92)
             # save R11 for next level up, if there is a next level up
-            if(!topLevel) {
+            if (!topLevel) {
               R11i <- sqrt(weightsC[[level+1]][gi])*ZiAR[-(1:qi),qi+1:qp1, drop=FALSE]
               # load in R11 to the correct level
               if(length(R11) >= lp1) {
@@ -330,7 +330,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
               lndetLzg[[gi]] <- lndetLzi
             }
           } # end if(level == 1 || level < ncol(groupID))
-          if(level>=2) {
+          if (level>=2) {
             ZiA <- rbind(pR11[[groups[gi]]], Deltai)
             R <- qr_qrr(ZiA) # probably faster than getchr(ZiA)
             # weight the results
