@@ -38,3 +38,6 @@ devtools::install_github("American-Institutes-for-Research/WeMix")
 install.packages("WeMix")
 ```
 
+## Contributions
+
+Contributions from external collaborators will be considered for inclusion in the package.
