@@ -31,7 +31,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">WeMix</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">3.1.5</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">3.1.9</span>
       </span>
     </div>
 
@@ -79,7 +79,7 @@
 
       
 
-      </header><script src="Introduction_to_Mixed_Effects_Models_With_WeMix_files/header-attrs-2.7/header-attrs.js"></script><div class="row">
+      </header><script src="Introduction_to_Mixed_Effects_Models_With_WeMix_files/header-attrs-2.11/header-attrs.js"></script><script src="Introduction_to_Mixed_Effects_Models_With_WeMix_files/accessible-code-block-0.0.1/empty-anchor.js"></script><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Introduction to Weighted Mixed-Effects Models With WeMix</h1>
@@ -109,7 +109,7 @@
 <code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html">install.packages</a></span><span class="op">(</span><span class="st">"WeMix"</span><span class="op">)</span></code></pre></div>
 <p>Once the package is successfully installed,  can be loaded with the following command:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/American-Institutes-for-Research/WeMix">WeMix</a></span><span class="op">)</span></code></pre></div>
+<code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://american-institutes-for-research.github.io/WeMix/">WeMix</a></span><span class="op">)</span></code></pre></div>
 </div>
 <div id="specifying-a-mixed-effects-model" class="section level1">
 <h1 class="hasAnchor">
@@ -210,7 +210,7 @@ y_{ij} = \beta_{0j} + X\beta_{1j}  + \epsilon_{ij}
 <p>This model is used when the data have binary outcomes (i.e., the number of successes in <em>m</em> trials). Here is an example of code using the <strong>sleepstudy</strong> data set in the  package:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/lme4/lme4/">lme4</a></span><span class="op">)</span>
-<span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/American-Institutes-for-Research/WeMix">WeMix</a></span><span class="op">)</span>
+<span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://american-institutes-for-research.github.io/WeMix/">WeMix</a></span><span class="op">)</span>
 <span class="va">ss1</span> <span class="op">&lt;-</span> <span class="va">sleepstudy</span>
 <span class="va">doubles</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="fl">308</span>, <span class="fl">309</span>, <span class="fl">310</span><span class="op">)</span> <span class="co"># subject with double obs</span>
 
@@ -361,66 +361,66 @@ E \left( \hat{\bm{u}}| \bm{y}, \bm{X}, \bm{Z}, \bm{W}, \bm{\theta} \right) = \fr
 <h2 class="hasAnchor">
 <a href="#stata-gllamm" class="anchor"></a>Stata: GLLAMM</h2>
 <p>In Stata prior to Version 14, weighted mixed-effects models could be estimated only with GLLAMM (Rabe-Hesketh, Skrondal, &amp; Pickles, 2004). The work of these GLLAMM authors provided the methods that we used in our implementation of nonlinear weighted mixed models in .</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>import delimited <span class="st">"PISA2012_USA.csv"</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>generate intercept <span class="ot">=</span> <span class="dv">1</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>eq intercept<span class="sc">:</span> intercept</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>eq slope<span class="sc">:</span> escs</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>tabulate st29q03, <span class="fu">generate</span> (st29q03d)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>tabulate sc14q02, <span class="fu">generate</span> (sc14q02d)</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>tabulate st04q01, <span class="fu">generate</span> (st04q01d)</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="sc">/</span><span class="er">/</span>Random intercept model </span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>gllamm pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2 </span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>escs, <span class="fu">i</span>(schoolid) <span class="fu">pweight</span>(pwt) <span class="fu">l</span>(identity) <span class="fu">f</span>(gau) <span class="fu">nip</span>(<span class="dv">27</span>) <span class="fu">nrf</span>(<span class="dv">1</span>) <span class="fu">eqs</span>(intercept) </span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>adapt nocorrel</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="sc">/</span><span class="er">/</span>Random slope and intercept model </span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>gllamm pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>escs, <span class="fu">i</span>(schoolid) <span class="fu">pweight</span>(pwt) <span class="fu">l</span>(identity) <span class="fu">f</span>(gau) <span class="fu">nip</span>(<span class="dv">13</span>) <span class="fu">nrf</span>(<span class="dv">2</span>) <span class="fu">eqs</span>(intercept slope) </span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>adapt nocorrel</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1"></a>import delimited <span class="st">"PISA2012_USA.csv"</span></span>
+<span id="cb6-2"><a href="#cb6-2"></a></span>
+<span id="cb6-3"><a href="#cb6-3"></a>generate intercept =<span class="st"> </span><span class="dv">1</span></span>
+<span id="cb6-4"><a href="#cb6-4"></a>eq intercept<span class="op">:</span><span class="st"> </span>intercept</span>
+<span id="cb6-5"><a href="#cb6-5"></a>eq slope<span class="op">:</span><span class="st"> </span>escs</span>
+<span id="cb6-6"><a href="#cb6-6"></a>tabulate st29q03, <span class="kw">generate</span> (st29q03d)</span>
+<span id="cb6-7"><a href="#cb6-7"></a>tabulate sc14q02, <span class="kw">generate</span> (sc14q02d)</span>
+<span id="cb6-8"><a href="#cb6-8"></a>tabulate st04q01, <span class="kw">generate</span> (st04q01d)</span>
+<span id="cb6-9"><a href="#cb6-9"></a></span>
+<span id="cb6-10"><a href="#cb6-10"></a><span class="op">/</span><span class="er">/</span>Random intercept model </span>
+<span id="cb6-11"><a href="#cb6-11"></a>gllamm pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2 </span>
+<span id="cb6-12"><a href="#cb6-12"></a>escs, <span class="kw">i</span>(schoolid) <span class="kw">pweight</span>(pwt) <span class="kw">l</span>(identity) <span class="kw">f</span>(gau) <span class="kw">nip</span>(<span class="dv">27</span>) <span class="kw">nrf</span>(<span class="dv">1</span>) <span class="kw">eqs</span>(intercept) </span>
+<span id="cb6-13"><a href="#cb6-13"></a>adapt nocorrel</span>
+<span id="cb6-14"><a href="#cb6-14"></a></span>
+<span id="cb6-15"><a href="#cb6-15"></a></span>
+<span id="cb6-16"><a href="#cb6-16"></a><span class="op">/</span><span class="er">/</span>Random slope and intercept model </span>
+<span id="cb6-17"><a href="#cb6-17"></a>gllamm pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2</span>
+<span id="cb6-18"><a href="#cb6-18"></a>escs, <span class="kw">i</span>(schoolid) <span class="kw">pweight</span>(pwt) <span class="kw">l</span>(identity) <span class="kw">f</span>(gau) <span class="kw">nip</span>(<span class="dv">13</span>) <span class="kw">nrf</span>(<span class="dv">2</span>) <span class="kw">eqs</span>(intercept slope) </span>
+<span id="cb6-19"><a href="#cb6-19"></a>adapt nocorrel</span></code></pre></div>
 </div>
 <div id="stata-mixed" class="section level2">
 <h2 class="hasAnchor">
 <a href="#stata-mixed" class="anchor"></a>Stata: mixed</h2>
 <p>In Stata Version 14, the <code>mixed</code> command includes the ability to fit models with survey weights (StataCorp, 2015).</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>import delimited <span class="st">"PISA2012_USA.csv"</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>tabulate st29q03, <span class="fu">generate</span> (st29q03d)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>tabulate sc14q02, <span class="fu">generate</span> (sc14q02d)</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>tabulate st04q01, <span class="fu">generate</span> (st04q01d)</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="sc">/</span><span class="er">/</span>Random intercept model </span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>mixed pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2 </span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>escs [pw <span class="ot">=</span> pwt1] <span class="sc">||</span> schoolid<span class="sc">:</span> , <span class="fu">pweight</span> (pwt2)</span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="sc">/</span><span class="er">/</span>Random slope and intercept model </span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>mixed pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>q01d2 escs [pw <span class="ot">=</span> pwt1] <span class="sc">||</span> schoolid<span class="sc">:</span> escs, <span class="fu">pweight</span> (pwt2)</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1"></a>import delimited <span class="st">"PISA2012_USA.csv"</span></span>
+<span id="cb7-2"><a href="#cb7-2"></a>tabulate st29q03, <span class="kw">generate</span> (st29q03d)</span>
+<span id="cb7-3"><a href="#cb7-3"></a>tabulate sc14q02, <span class="kw">generate</span> (sc14q02d)</span>
+<span id="cb7-4"><a href="#cb7-4"></a>tabulate st04q01, <span class="kw">generate</span> (st04q01d)</span>
+<span id="cb7-5"><a href="#cb7-5"></a></span>
+<span id="cb7-6"><a href="#cb7-6"></a><span class="op">/</span><span class="er">/</span>Random intercept model </span>
+<span id="cb7-7"><a href="#cb7-7"></a>mixed pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2 </span>
+<span id="cb7-8"><a href="#cb7-8"></a>escs [pw =<span class="st"> </span>pwt1] <span class="op">||</span><span class="st"> </span>schoolid<span class="op">:</span><span class="st"> </span>, <span class="kw">pweight</span> (pwt2)</span>
+<span id="cb7-9"><a href="#cb7-9"></a></span>
+<span id="cb7-10"><a href="#cb7-10"></a><span class="op">/</span><span class="er">/</span>Random slope and intercept model </span>
+<span id="cb7-11"><a href="#cb7-11"></a>mixed pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04</span>
+<span id="cb7-12"><a href="#cb7-12"></a>q01d2 escs [pw =<span class="st"> </span>pwt1] <span class="op">||</span><span class="st"> </span>schoolid<span class="op">:</span><span class="st"> </span>escs, <span class="kw">pweight</span> (pwt2)</span></code></pre></div>
 </div>
 <div id="sas-proc-glimmix" class="section level2">
 <h2 class="hasAnchor">
 <a href="#sas-proc-glimmix" class="anchor"></a>SAS <code>PROC GLIMMIX</code>
 </h2>
 <p>Model specification in SAS uses the <code>PROC GLIMMIX</code> procedure (SAS Institute Inc., 2013). It is notable here that when fit with the default optimization parameters, the model converged to a likelihood lower than the maximum likelihood estimate found by other software. Decreasing the convergence parameter GCONV to E-10 was necessary to find the same maximum likelihood as other software.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>PROC IMIPORT DATAFILE<span class="ot">=</span><span class="st">"PISA2012_USA.csv"</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>     OUT<span class="ot">=</span>pisa_data DBMS<span class="ot">=</span>csv REPLACE;</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>RUN;</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>PROC GLIMMIX DATA<span class="ot">=</span>pisa_data METHOD<span class="ot">=</span><span class="fu">quadrature</span>(<span class="at">qpoints=</span><span class="dv">27</span>) EMPIRICAL<span class="ot">=</span>classical NOREML; </span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  NLOPTIONS GCONV<span class="ot">=</span><span class="fl">1E-10</span> TECHNIQUE<span class="ot">=</span>TRUREG;</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  CLASS  <span class="fu">sc14q02</span>(<span class="at">REF=</span><span class="st">'Not at all'</span>) <span class="fu">st04q01</span>(<span class="at">REF=</span><span class="st">'Female'</span>) <span class="fu">st29q03</span>(<span class="at">REF=</span><span class="st">'Strongly agree'</span>);</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  MODEL pv1math <span class="ot">=</span> escs sc14q02 st04q01 st29q03<span class="sc">/</span> OBSWEIGHT<span class="ot">=</span>pwt1 SOLUTION;</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  RANDOM INT<span class="sc">/</span>subject<span class="ot">=</span>schoolid WEIGHT<span class="ot">=</span>pwt2;</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>RUN;</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>     </span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>PROC GLIMMIX DATA<span class="ot">=</span>pisa_data METHOD<span class="ot">=</span><span class="fu">quadrature</span>(<span class="at">qpoints=</span><span class="dv">13</span>) EMPIRICAL<span class="ot">=</span>classical NOREML;</span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  NLOPTIONS GCONV<span class="ot">=</span><span class="fl">1E-10</span> TECHNIQUE<span class="ot">=</span>TRUREG;</span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  CLASS  <span class="fu">sc14q02</span>(<span class="at">REF=</span><span class="st">'Not at all'</span>) <span class="fu">st04q01</span>(<span class="at">REF=</span><span class="st">'Female'</span>) <span class="fu">st29q03</span>(<span class="at">REF=</span><span class="st">'Strongly agree'</span>);</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  MODEL pv1math <span class="ot">=</span> escs sc14q02 st04q01 st29q03<span class="sc">/</span> OBSWEIGHT<span class="ot">=</span>pwt1 SOLUTION;</span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>  RANDOM intercept escs<span class="sc">/</span>subject<span class="ot">=</span>schoolid WEIGHT<span class="ot">=</span>pwt2;</span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>RUN;</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1"></a>PROC IMIPORT DATAFILE=<span class="st">"PISA2012_USA.csv"</span></span>
+<span id="cb8-2"><a href="#cb8-2"></a>     OUT=pisa_data DBMS=csv REPLACE;</span>
+<span id="cb8-3"><a href="#cb8-3"></a>RUN;</span>
+<span id="cb8-4"><a href="#cb8-4"></a></span>
+<span id="cb8-5"><a href="#cb8-5"></a>PROC GLIMMIX DATA=pisa_data METHOD=<span class="kw">quadrature</span>(<span class="dt">qpoints=</span><span class="dv">27</span>) EMPIRICAL=classical NOREML; </span>
+<span id="cb8-6"><a href="#cb8-6"></a>  NLOPTIONS GCONV=<span class="fl">1E-10</span> TECHNIQUE=TRUREG;</span>
+<span id="cb8-7"><a href="#cb8-7"></a>  CLASS  <span class="kw">sc14q02</span>(<span class="dt">REF=</span><span class="st">'Not at all'</span>) <span class="kw">st04q01</span>(<span class="dt">REF=</span><span class="st">'Female'</span>) <span class="kw">st29q03</span>(<span class="dt">REF=</span><span class="st">'Strongly agree'</span>);</span>
+<span id="cb8-8"><a href="#cb8-8"></a>  MODEL pv1math =<span class="st"> </span>escs sc14q02 st04q01 st29q03<span class="op">/</span><span class="st"> </span>OBSWEIGHT=pwt1 SOLUTION;</span>
+<span id="cb8-9"><a href="#cb8-9"></a>  RANDOM INT<span class="op">/</span>subject=schoolid WEIGHT=pwt2;</span>
+<span id="cb8-10"><a href="#cb8-10"></a>RUN;</span>
+<span id="cb8-11"><a href="#cb8-11"></a></span>
+<span id="cb8-12"><a href="#cb8-12"></a>     </span>
+<span id="cb8-13"><a href="#cb8-13"></a>PROC GLIMMIX DATA=pisa_data METHOD=<span class="kw">quadrature</span>(<span class="dt">qpoints=</span><span class="dv">13</span>) EMPIRICAL=classical NOREML;</span>
+<span id="cb8-14"><a href="#cb8-14"></a>  NLOPTIONS GCONV=<span class="fl">1E-10</span> TECHNIQUE=TRUREG;</span>
+<span id="cb8-15"><a href="#cb8-15"></a>  CLASS  <span class="kw">sc14q02</span>(<span class="dt">REF=</span><span class="st">'Not at all'</span>) <span class="kw">st04q01</span>(<span class="dt">REF=</span><span class="st">'Female'</span>) <span class="kw">st29q03</span>(<span class="dt">REF=</span><span class="st">'Strongly agree'</span>);</span>
+<span id="cb8-16"><a href="#cb8-16"></a>  MODEL pv1math =<span class="st"> </span>escs sc14q02 st04q01 st29q03<span class="op">/</span><span class="st"> </span>OBSWEIGHT=pwt1 SOLUTION;</span>
+<span id="cb8-17"><a href="#cb8-17"></a>  RANDOM intercept escs<span class="op">/</span>subject=schoolid WEIGHT=pwt2;</span>
+<span id="cb8-18"><a href="#cb8-18"></a>RUN;</span></code></pre></div>
 </div>
 <div id="hlm" class="section level2">
 <h2 class="hasAnchor">
@@ -435,52 +435,52 @@ E \left( \hat{\bm{u}}| \bm{y}, \bm{X}, \bm{Z}, \bm{W}, \bm{\theta} \right) = \fr
 <h2 class="hasAnchor">
 <a href="#m" class="anchor"></a>M+</h2>
 <p>M+ is another common software used to fix mixed effects models. You should plan to make all categorical variables into dummy variables prior to fitting the model. To fit the random intercept model, use the following:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>DATA<span class="sc">:</span> FILE<span class="ot">=</span> pisa_2012_with_dummies.csv;</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>VARIABLE<span class="sc">:</span> NAMES<span class="ot">=</span> id schoolid pv1math escs pwt1 pwt2 s29q03d1 s29q03d2</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>s29q03d4 int c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>CLUSTER <span class="ot">=</span> schoolid;</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>WITHIN <span class="ot">=</span> escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>USEVARIABLES<span class="ot">=</span> schoolid pv1math escs  s29q03d1 s29q03d2</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2 pwt1 pwt2;</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>WEIGHT IS pwt1;</span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>BWEIGHT <span class="ot">=</span> pwt2;</span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>wtscale<span class="ot">=</span>unscaled;</span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>bwtscale<span class="ot">=</span>unscaled;</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>ANALYSIS<span class="sc">:</span> TYPE <span class="ot">=</span> TWOLEVEL;</span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>MODEL<span class="sc">:</span></span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="sc">%WITHIN%</span></span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>pv1math ON escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="sc">%BETWEEN%</span></span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>pv1math;</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1"></a>DATA<span class="op">:</span><span class="st"> </span>FILE=<span class="st"> </span>pisa_<span class="dv">2012</span>_with_dummies.csv;</span>
+<span id="cb9-2"><a href="#cb9-2"></a></span>
+<span id="cb9-3"><a href="#cb9-3"></a>VARIABLE<span class="op">:</span><span class="st"> </span>NAMES=<span class="st"> </span>id schoolid pv1math escs pwt1 pwt2 s29q03d1 s29q03d2</span>
+<span id="cb9-4"><a href="#cb9-4"></a>s29q03d4 int c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb9-5"><a href="#cb9-5"></a>CLUSTER =<span class="st"> </span>schoolid;</span>
+<span id="cb9-6"><a href="#cb9-6"></a>WITHIN =<span class="st"> </span>escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb9-7"><a href="#cb9-7"></a></span>
+<span id="cb9-8"><a href="#cb9-8"></a>USEVARIABLES=<span class="st"> </span>schoolid pv1math escs  s29q03d1 s29q03d2</span>
+<span id="cb9-9"><a href="#cb9-9"></a>s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2 pwt1 pwt2;</span>
+<span id="cb9-10"><a href="#cb9-10"></a></span>
+<span id="cb9-11"><a href="#cb9-11"></a>WEIGHT IS pwt1;</span>
+<span id="cb9-12"><a href="#cb9-12"></a>BWEIGHT =<span class="st"> </span>pwt2;</span>
+<span id="cb9-13"><a href="#cb9-13"></a>wtscale=unscaled;</span>
+<span id="cb9-14"><a href="#cb9-14"></a>bwtscale=unscaled;</span>
+<span id="cb9-15"><a href="#cb9-15"></a></span>
+<span id="cb9-16"><a href="#cb9-16"></a>ANALYSIS<span class="op">:</span><span class="st"> </span>TYPE =<span class="st"> </span>TWOLEVEL;</span>
+<span id="cb9-17"><a href="#cb9-17"></a></span>
+<span id="cb9-18"><a href="#cb9-18"></a>MODEL<span class="op">:</span></span>
+<span id="cb9-19"><a href="#cb9-19"></a><span class="op">%WITHIN%</span></span>
+<span id="cb9-20"><a href="#cb9-20"></a>pv1math ON escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb9-21"><a href="#cb9-21"></a><span class="op">%BETWEEN%</span></span>
+<span id="cb9-22"><a href="#cb9-22"></a>pv1math;</span></code></pre></div>
 <p>To fit the random slope model, use the following:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>DATA<span class="sc">:</span> FILE<span class="ot">=</span>pisa_2012_with_dummies.csv;</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>VARIABLE<span class="sc">:</span> NAMES<span class="ot">=</span> id schoolid pv1math escs pwt1 pwt2 s29q03d1 s29q03d2</span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>s29q03d4 int c14q02d1 c14q02d2 c14q02d4 s04q01d2 escs2;</span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>CLUSTER <span class="ot">=</span> schoolid;</span>
-<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>WITHIN <span class="ot">=</span> escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>USEVARIABLES<span class="ot">=</span> schoolid pv1math escs  s29q03d1 s29q03d2</span>
-<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2 pwt1 pwt2;</span>
-<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>WEIGHT IS pwt1;</span>
-<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>BWEIGHT <span class="ot">=</span> pwt2;</span>
-<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>wtscale<span class="ot">=</span>unscaled;</span>
-<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>bwtscale<span class="ot">=</span>unscaled;</span>
-<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>ANALYSIS<span class="sc">:</span> TYPE <span class="ot">=</span> TWOLEVEL RANDOM;</span>
-<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>MODEL<span class="sc">:</span></span>
-<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a><span class="sc">%WITHIN%</span></span>
-<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>pv1math on s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>slope <span class="sc">|</span> pv1math ON escs ;</span>
-<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a><span class="sc">%BETWEEN%</span></span>
-<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a>pv1math with slope <span class="sc">@</span><span class="dv">0</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1"></a>DATA<span class="op">:</span><span class="st"> </span>FILE=pisa_<span class="dv">2012</span>_with_dummies.csv;</span>
+<span id="cb10-2"><a href="#cb10-2"></a></span>
+<span id="cb10-3"><a href="#cb10-3"></a>VARIABLE<span class="op">:</span><span class="st"> </span>NAMES=<span class="st"> </span>id schoolid pv1math escs pwt1 pwt2 s29q03d1 s29q03d2</span>
+<span id="cb10-4"><a href="#cb10-4"></a>s29q03d4 int c14q02d1 c14q02d2 c14q02d4 s04q01d2 escs2;</span>
+<span id="cb10-5"><a href="#cb10-5"></a>CLUSTER =<span class="st"> </span>schoolid;</span>
+<span id="cb10-6"><a href="#cb10-6"></a>WITHIN =<span class="st"> </span>escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb10-7"><a href="#cb10-7"></a></span>
+<span id="cb10-8"><a href="#cb10-8"></a>USEVARIABLES=<span class="st"> </span>schoolid pv1math escs  s29q03d1 s29q03d2</span>
+<span id="cb10-9"><a href="#cb10-9"></a>s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2 pwt1 pwt2;</span>
+<span id="cb10-10"><a href="#cb10-10"></a></span>
+<span id="cb10-11"><a href="#cb10-11"></a>WEIGHT IS pwt1;</span>
+<span id="cb10-12"><a href="#cb10-12"></a>BWEIGHT =<span class="st"> </span>pwt2;</span>
+<span id="cb10-13"><a href="#cb10-13"></a>wtscale=unscaled;</span>
+<span id="cb10-14"><a href="#cb10-14"></a>bwtscale=unscaled;</span>
+<span id="cb10-15"><a href="#cb10-15"></a></span>
+<span id="cb10-16"><a href="#cb10-16"></a>ANALYSIS<span class="op">:</span><span class="st"> </span>TYPE =<span class="st"> </span>TWOLEVEL RANDOM;</span>
+<span id="cb10-17"><a href="#cb10-17"></a></span>
+<span id="cb10-18"><a href="#cb10-18"></a>MODEL<span class="op">:</span></span>
+<span id="cb10-19"><a href="#cb10-19"></a><span class="op">%WITHIN%</span></span>
+<span id="cb10-20"><a href="#cb10-20"></a>pv1math on s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb10-21"><a href="#cb10-21"></a>slope <span class="op">|</span><span class="st"> </span>pv1math ON escs ;</span>
+<span id="cb10-22"><a href="#cb10-22"></a><span class="op">%BETWEEN%</span></span>
+<span id="cb10-23"><a href="#cb10-23"></a>pv1math with slope <span class="op">@</span><span class="dv">0</span></span></code></pre></div>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
@@ -527,7 +527,7 @@ E \left( \hat{\bm{u}}| \bm{y}, \bm{X}, \bm{Z}, \bm{W}, \bm{\theta} \right) = \fr
 
 
       <footer><div class="copyright">
-  <p>Developed by Paul Bailey.</p>
+  <p>Developed by Paul Bailey, Claire Kelley, Trang Nguyen, Huade Huo.</p>
 </div>
 
 <div class="pkgdown">
