@@ -14,9 +14,13 @@
 #' @importFrom methods as .hasSlot rbind2 
 analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, groupID, lmeVarDF, analyticJacobian=FALSE, forcebaseQR=FALSE, qr_=qr_0, v0, lndetLz0=NULL) {
 
-  if(!inherits(groupID, "matrix")) {
-    stop(paste0("Variable", dQuote(groupID)," must be a matrix with IDs at a level per column."))
+  if(! inherits(groupID, c("matrix", "data.frame")) ) {
+    stop(paste0("Variable", dQuote("groupID")," must be a matrix  or data.frame with IDs at a level per column."))
   }
+  # this has the indexes, but we do not need those. Save them here
+  groupID0 <- groupID
+  # now winnow down to just the expected number of columns
+  groupID <- as.matrix(groupID[ , 1:(length(weights)-1), drop=FALSE])
   if(!inherits(y, "numeric")) {
     stop(paste0(dQuote("y"), " must be a numeric vector."))
   }
@@ -41,7 +45,6 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
   if(ngid != nX) {
     stop(paste0("Number of rows in ", dQuote("groupID") , " must agree with number of rows in ", dQuote("X"),"."))
   }
-  
   # groupID needs to be one indexed, so enforce that (this is used for robustSE)
   groupID[,ncol(groupID)] <- as.numeric(as.factor(groupID[,ncol(groupID)]))
   # get the number of groups per level
@@ -114,7 +117,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
   for(i in 1:ncol(groupID)) {
     l0 <- c(l0, list(NULL))
   }
-  uvl <- lapply(unique(groupID[,ncol(groupID)]), function(tid) { l0 } )
+  uvl <- lapply(unique(groupID[ , ncol(groupID)]), function(tid) { l0 } )
   uv0 <- 1:ncol(Z)
   # build Z to cache it
   for(level in 1:ncol(groupID)) {
@@ -198,11 +201,15 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
     } # end for(gi in 1:length(groups))
   } # end for(level in 1:ncol(groupID))
 
+  preKR <- lapply(2:levels, function(l) {
+    diag(1, unique(lmeVarDF[lmeVarDF$level==l & is.na(lmeVarDF$var2),"ngrp"]))
+  })
+
   function(v, verbose=FALSE, beta=NULL, sigma=NULL, robustSE=FALSE, returnBetaf=FALSE, getGrad=FALSE, lndetLz0u=TRUE) {
     beta0 <- beta
     sigma0 <- sigma
     omegaVec <- v
-
+    
     #Create list delta and lambda Matrixes for each level
     # iDelta is the inverse Delta (lambda pre kronecker) for forming VC estimates in the end
     iDelta <- Delta <- list()
@@ -232,7 +239,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
       iDelta[[l]] <- fixed$lambda
       Delta[[l]] <- fixed$lambdaInv
       #assemble blockwise lambda by level matrix 
-      lambda_by_level[[l]] <- kronecker(lambda_i, diag(1, unique(lmeVarDF[lmeVarDF$level==l & is.na(lmeVarDF$var2),"ngrp"])))
+      lambda_by_level[[l]] <- kronecker(lambda_i, preKR[[l-1]])
     }
   
     #Create lambda matrix from diagonal of all lamdas 
@@ -288,9 +295,9 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
             # get Zi
             ZiA <- ZiAl[[gi]]
             if(!topLevel) {
-              # this may work for 3 level, will need to consider selection by row for >3 
               Zrows <- groupID[ , level] == groups[gi]
-              lp1 <- unique(groupID[Zrows,level+1])
+              # unit ID for level above this
+              lp1 <- unique(groupID[Zrows, level+1])
               qp1 <- nrow(Delta[[level+2]])
             }
             qi <- nrow(Deltai) 
@@ -318,30 +325,29 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
             if (!topLevel) {
               R11i <- sqrt(weightsC[[level+1]][gi])*ZiAR[-(1:qi),qi+1:qp1, drop=FALSE]
               # load in R11 to the correct level
-              if(length(R11) >= lp1) {
-                R11[[lp1]] <- rbind(R11[[lp1]], R11i)
-                lndetLzg[[lp1]] <- lndetLzg[[lp1]] + lndetLzi
-              } else {
+              # this if/else allows lp1 to be out of order
+              if(length(R11) < lp1 || is.null(R11[[lp1]])) {
                 # there was no R11, so start it off with this R11
                 R11[[lp1]] <- R11i
                 lndetLzg[[lp1]] <- lndetLzi
+              } else {
+                R11[[lp1]] <- rbind(R11[[lp1]], R11i)
+                lndetLzg[[lp1]] <- lndetLzg[[lp1]] + lndetLzi
               }
             } else {
-              lndetLzg[[gi]] <- lndetLzi
+              lndetLzg[[groups[gi]]] <- lndetLzi
             }
           } # end if(level == 1 || level < ncol(groupID))
           if (level>=2) {
             ZiA <- rbind(pR11[[groups[gi]]], Deltai)
             R <- qr_qrr(ZiA) # probably faster than getchr(ZiA)
             # weight the results
-            lndetLzi <- weights[[level+1]][gi]*(- (as.numeric(determinant(Deltai)$mod)) +
+            # groups goes back to this unit
+            lndetLzi <- weights[[level+1]][groups[gi]]*(- (as.numeric(determinant(Deltai)$mod)) +
                         sum(log(abs(Matrix::diag(R)[1:ncol(Deltai)])))) # equation 92
-            lndetLzg[[gi]] <- lndetLzg[[gi]] + lndetLzi
+            lndetLzg[[groups[gi]]] <- lndetLzg[[groups[gi]]] + lndetLzi
           }
           lndetLz <- lndetLz + lndetLzi
-          if(verbose) {
-            cat("gi=", gi, " lndetLzi=", lndetLzi, " lndetLz=", lndetLz,"w=", weights[[level+1]][gi], "\n")
-          }
         } # end for(gi in 1:length(groups))
         if(level < ncol(groupID)) {
           pR11 <- R11
@@ -356,7 +362,6 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
       }
     }
   
-    
     # wrap the random effect vector to matrix format so that each row regards one group
     bb <- list()
     vc <- matrix(nrow=1+length(v), ncol=1+length(v))
@@ -373,15 +378,12 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
     discrep <- discf(y, Zt, X, lambda, u, Psi12, W12, b)
     # the R22 matrix, bottom right of the big R, conforms with b
     R <- chr_(A, qr_a)
-    Rrows <- nrow(R)-length(b):1+1
+    Rrows <- nrow(R) - length(b):1 +1
     Rrows <- Rrows[Rrows > length(u)]
-    RX <- R[Rrows,ncol(R)-length(b):1+1,drop=FALSE]
+    RX <- R[Rrows, ncol(R) - length(b):1 +1, drop=FALSE]
     nx <- sum(W0)
     # residual
-    sigma <- sqrt(discrep / nx)
-    if(!is.null(sigma0)) {
-      sigma <- sigma0
-    }
+    sigma <- ifelse(is.null(sigma0), sqrt(discrep / nx), sigma0)
     dev <- 0
     if(lndetLz0u) {
       # lndetLz may be a Matrix, convert it
@@ -400,6 +402,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
     }
     # add R22 term if beta is not beta-hat
     if(returnBetaf) {
+      # a function that returns the lnl varying beta only
       f <- function(beta0) {
         db <- beta0 - b
         # for an illconditioned (or uninvertable) A-matrix there will be NAs
@@ -449,10 +452,10 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
       #Calculate robust standardize effect
       # based on the sandwich estimator of Rabe-Hesketh and Skrondal 2006
       # this whole calculation focuses on calculating the liklihood at the top group level 
-      fgroupID <- groupID[,ncol(groupID)] 
+      fgroupID <- groupID[ , ncol(groupID)] 
       uf <- unique(fgroupID) # unique final groupIDs
       # store lnl to check later
-      lnli2<- lnli <- vector(length=length(uf))
+      lnli2 <- lnli <- vector(length=length(uf))
       Jacobian <- matrix(NA, nrow=length(uf), ncol=length(b)+length(v)+1)
       bwiL <- list()
       #this code block seperates wieghts into the set of weights belonging to each top level group 
@@ -460,11 +463,12 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
       wres <- W12 %*% (y - Matrix::t(Zt) %*% lambda %*% u - X %*% b) # residual
       ures <- Psi12 %*% u # augmented ehat
       for(gi in 1:length(uf)) {
-        sgi <- fgroupID == gi # subset for group gi
+        giuf <- uf[gi] # index for this unit
+        sgi <- fgroupID == giuf # subset for group gi
         weightsPrime <- list(weights[[1]][sgi])
         weightsCPrime <- list(weightsC[[1]][sgi])
         for(i in 2:length(weights)) {
-          theseGroups <- unique(groupID[sgi,i-1])
+          theseGroups <- unique(groupID[sgi, i-1])
           weightsPrime[[i]] <- weights[[i]][theseGroups]
           weightsCPrime[[i]] <- weightsC[[i]][theseGroups]
         }
@@ -480,12 +484,13 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
         #calculate the group level likelihood by applying the function to only the x or y within the group indexed by sgi
         # overall dev (lnl=dev/-2) 
         # dev <- 2*lndetLz + nx*log(2*pi*(sigma^2)) + discrep/sigma^2
-        lnli2[gi] <- 2*lndetLzg[[gi]]/-2 + sum(sum(W0[sgi]))*log(2*pi*sigma^2)/-2 + sum(wres[sgi]^2)/sigma^2/-2 + sum(ures[unlist(uvl[[gi]])]^2)/sigma^2/-2
+        # VERIFIED: uvl is mapped to the index ID, so use giuf
+        lnli2[gi] <- 2*lndetLzg[[giuf]]/-2 + sum(sum(W0[sgi]))*log(2*pi*sigma^2)/-2 + sum(wres[sgi]^2)/sigma^2/-2 + sum(ures[unlist(uvl[[giuf]])]^2)/sigma^2/-2
         # zero index for this level, used in Zlist argument a few lines down
         ind0 <- c(0,cumsum(lapply(Zlist, ncol)))
         bwi <- analyticSolve(y=y[sgi], X=X[sgi,,drop=FALSE],
                   Zlist=lapply(1:length(Zlist), function(lvl) {
-                      cols <- sort(unlist(uvl[[gi]][[lvl]])) - ind0[lvl]
+                      cols <- sort(unlist(uvl[[giuf]][[lvl]])) - ind0[lvl]
                       tryCatch(Zlist[[lvl]][sgi, cols, drop=FALSE], error=function(e){stop("Could not build Zlist.")})
                     }),
                   Zlevels=Zlevels,
@@ -494,8 +499,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
                   groupID=groupIDi,
                   lmeVarDF=lmeVarDFi,
                   v0=v,
-                  lndetLz0=lndetLzg[[gi]])
-
+                  lndetLz0=lndetLzg[[giuf]])
         tryCatch(lnli[gi] <- bwi(v=v, verbose=verbose, beta=b, sigma=sigma, robustSE=FALSE)$lnl,
                  error= function(e) {
                    lnli[gi] <<- NA
@@ -505,7 +509,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
           # normally base::qr works in these cases, so use that instead
           bwi <- analyticSolve(y=y[sgi], X[sgi,,drop=FALSE],
                                Zlist=lapply(1:length(Zlist), function(lvl) {
-                                       cols <- sort(unlist(uvl[[gi]][[lvl]])) - ind0[lvl]
+                                       cols <- sort(unlist(uvl[[giuf]][[lvl]])) - ind0[lvl]
                                        tryCatch(Zlist[[lvl]][sgi, cols, drop=FALSE], error=function(e){stop("Could not build Zlist.")})
                                       }),
                                Zlevels=Zlevels,
@@ -515,7 +519,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
                                lmeVarDF=lmeVarDFi,
                                qr_=qr_s,
                                v0=v,
-                               lndetLz0=lndetLzg[[gi]]) 
+                               lndetLz0=lndetLzg[[giuf]]) 
            bwiL <- c(bwiL, list(bwi))
            tryCatch(lnli[gi] <- bwi(v=v, verbose=verbose, beta=b, sigma=sigma, robustSE=FALSE)$lnl,
                     error= function(e) {

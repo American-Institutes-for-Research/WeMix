@@ -455,9 +455,9 @@ test_that("summary output format", {
            "mix(formula = Reaction ~ Days + (car || Subject), data = ss2, ",
            "    weights = c(\"w1\", \"w2\"))", "", "Variance terms:",
            " Level    Group        Name Variance Std. Error Std.Dev. Corr1 Corr2", 
-           "     2  Subject (Intercept)      698        461     26.4            ", 
-           "     2  Subject    carFALSE      214        117     14.6     0      ", 
-           "     2  Subject     carTRUE     1619        737     40.2     0  0.92", 
+           "     2  Subject (Intercept)      698        385     26.4            ", 
+           "     2  Subject    carFALSE      213        231     14.6     0      ", 
+           "     2  Subject     carTRUE     1619        849     40.2     0  0.92", 
            "     1 Residual                  808        162     28.4            ", 
            "Groups:",
            " Level   Group n size mean wgt sum wgt",
@@ -471,7 +471,7 @@ test_that("summary output format", {
            "",
            "lnl= -890.68 ",
            "Intraclass Correlation= 0.758 ")
-  wm0 <- mix(Reaction ~ Days + (car||Subject), data=ss2, weights=c("w1", "w2"))
+  expect_warning(wm0 <- mix(Reaction ~ Days + (car||Subject), data=ss2, weights=c("w1", "w2")), "standard error of variance terms")
   withr::with_options(list(digits=2),
                        co <- capture.output(summary(wm0))
                      )
@@ -685,9 +685,9 @@ test_that("PISA tests", {
   downloadPISA(root=edsurveyHome, years=2012, cache=FALSE, verbose=FALSE)
   cntl <- readPISA(file.path(edsurveyHome, "PISA/2012"), countries = "USA", verbose=FALSE)
   om <- getAttributes(cntl, "omittedLevels")
-  data <- getData(cntl,c("schoolid","pv1math","st29q03","sc14q02","st04q01",
-                         "escs","w_fschwt","w_fstuwt"), 
-                  omittedLevels = FALSE, addAttributes = FALSE)
+  data <- EdSurvey::getData(cntl, c("schoolid","pv1math","st29q03","sc14q02","st04q01",
+                                    "escs","w_fschwt","w_fstuwt"), 
+                            omittedLevels = FALSE, addAttributes = FALSE)
   
   # Remove NA and omitted Levels
   om <- c("Invalid","N/A","Missing","Miss",NA,"(Missing)")
@@ -761,7 +761,7 @@ test_that("Model Matrix has a hard time with", {
   skip_on_cran()
   require(EdSurvey)
   sdf <- readNAEP(system.file("extdata/data", "M36NT2PM.dat", package = "NAEPprimer"))
-  gg <- getData(varnames=c("composite", "dsex", "b017451", "scrpsu", "origwt", "smsrswt"), data=sdf, returnJKreplicates=FALSE)
+  gg <- EdSurvey::getData(varnames=c("composite", "dsex", "b017451", "scrpsu", "origwt", "smsrswt"), data=sdf, returnJKreplicates=FALSE)
   gg2 <- gg[gg$origwt > 0 & gg$smsrswt > 0,]
   suppressMessages(m4 <- mix(mrpcm2 ~ dsex + b017451 + (1|scrpsu), data=gg2, weights=c("origwt", "smsrswt")))
   expect_equal(m4$lnl, -81882.3634148408, tol=1e-5)
@@ -819,9 +819,9 @@ test_that("examples run", {
 
   #read in data 
   cntl <- readPISA(file.path(edsurveyHome,"PISA/2012"), countries="USA", verbose=FALSE)
-  data <- getData(cntl,c("schoolid","pv1math","st29q03","sc14q02","st04q01",
-                         "escs","w_fschwt","w_fstuwt"), 
-                  omittedLevels=FALSE, addAttributes=FALSE)
+  data <- EdSurvey::getData(cntl,c("schoolid","pv1math","st29q03","sc14q02","st04q01",
+                                   "escs","w_fschwt","w_fstuwt"), 
+                            omittedLevels=FALSE, addAttributes=FALSE)
 
   # Remove NA and omitted Levels
   om <- c("Invalid", "N/A", "Missing", "Miss", NA, "(Missing)")
@@ -864,43 +864,46 @@ test_that("Model with top level groups that have entirely 0 columns in Z", {
   require(EdSurvey)
   downloadECLS_K(root=edsurveyHome, years=2011)
   ee <- readECLS_K2011(paste0(edsurveyHome, "ECLS_K/2011/"), verbose=FALSE)
-  gg <- getData(c("x2rscalk5", "childid", "s2_id", "w1_2p0", "x3sumsh", "p1chldbk","p2freerd"), data=ee, omittedLevels=FALSE, returnJKreplicates=FALSE)
+  gg <- EdSurvey::getData(c("x2rscalk5", "childid", "s2_id", "w1_2p0", "x3sumsh", "p1chldbk","p2freerd"), data=ee, omittedLevels=FALSE, returnJKreplicates=FALSE)
   gg$frpl <- ifelse(gg$p2freerd %in% c("1: FREE LUNCH", "2: REDUCED PRICE LUNCH"), 1, 0)
   gg$w1 <- gg$w1_2p0
   gg$w2 <- 1
   gg$n <- ave(gg$s2_id,gg$s2_id, FUN=length)
   gg2 <- gg[!is.na(gg$x2rscalk5) & gg$w1>0 & !is.na(gg$p1chldbk) & gg$n > 15 & gg$s2_id < 1500,]
+  if(FALSE) {
+    gg2 <- gg[!is.na(gg$x2rscalk5) & gg$w1>0 & !is.na(gg$p1chldbk) & gg$n > 15,]
+    pv <- profvis(m3 <- mix(x2rscalk5 ~ p1chldbk + frpl + (1+frpl|s2_id), data=gg2, weights=c("w1", "w2"), verbose=FALSE))
+  }
   m3 <- mix(x2rscalk5 ~ p1chldbk + frpl + (1+frpl|s2_id), data=gg2, weights=c("w1", "w2"), verbose=FALSE)
   # regression tests
-  expect_equal(m3$lnl, -1513119.73817376, tol=1e-5)
-  expect_equal(m3$coef, c(`(Intercept)` = 67.5434743459653, p1chldbk = 0.0287511027423215, frpl = -4.62934048945893), tol=1e-5)
-  expect_equal(m3$SE, c(`(Intercept)` = 1.07449754776874, p1chldbk = 0.00668096358477409, frpl = 1.12769131710247), tol=1e-5)
-  varDF0 <- structure(list(grp = c("s2_id", "s2_id", "s2_id", "Residual"), 
+  expect_equal(m3$lnl, -4076916.913043, tol=1e-5)
+  expect_equal(m3$coef, c(`(Intercept)` = 68.9855317534602, p1chldbk = 0.00849589076218699, frpl = -4.09352553895415), tol=1e-5)
+  expect_equal(m3$SE, c(`(Intercept)` = 0.5581593716085, p1chldbk = 0.0032088689344584, frpl = 0.648499658236494), tol=1e-5)
+  varDF0 <- structure(list(grp = c("s2_id", "s2_id", "s2_id", "Residual"),
                            var1 = c("(Intercept)", "frpl", "(Intercept)", NA),
                            var2 = c(NA, NA, "frpl", NA),
-                           vcov = c(82.1115665535057, 103.939072336388, -57.1975297909512, 151.622543466079),
-                           ngrp = c(97, 97, 97, 1520),
+                           vcov = c(60.7787852874039, 92.4431165557077, -41.5862322447801, 146.8701875209),
+                           ngrp = c(267, 267, 267, 4157),
                            level = c(2, 2, 2, 1),
-                           SEvcov =  c(17.082223467814, 20.4018480839976, 15.328078288835, 10.0505684893662),
+                           SEvcov = c(6.9519895469951, 11.689761168921, 6.60584252260271, 6.4705289515189),
                            fullGroup = c("s2_id.(Intercept)", "s2_id.frpl", "s2_id.(Intercept)", "Residual")),
-                       row.names = c(NA, -4L), class = "data.frame")
+                           row.names = c(NA, -4L), class = "data.frame")
   expect_equal(m3$varDF, varDF0, tol=1e-5)
 })
 
 context("TIMSS tests")
 test_that("TIMSS tests", {
   skip_on_cran()
-  require(EdSurvey)
-
   # original version by Christian Kjeldsen
   downloadTIMSS(root=edsurveyHome, years=2015, cache=FALSE, verbose=FALSE)
   dnk15 <- readTIMSS(file.path(edsurveyHome,"/TIMSS/2015"), countries="dnk", gradeLvl=4, verbose=FALSE)
-  dnk15dat <- getData(data=dnk15, varnames=c("atbg01", "asbgsb", "mmat", "asbghrl", "matwgt", "idschool","schwgt"))
+  dnk15dat <- EdSurvey::getData(data=dnk15, varnames=c("atbg01", "asbgsb", "mmat", "asbghrl", "matwgt", "idschool","schwgt"))
   dnk15dat <- subset(dnk15dat, matwgt > 0 & schwgt > 0)
   dnk15dat$cwt2_math <- dnk15dat$schwgt
   dnk15dat$cwt1_math <- dnk15dat$matwgt/dnk15dat$schwgt
   # variance estimation requires a matrix singular by base standards but not Matrix standards
   mm2 <- mix(asmmat01 ~ atbg01 + asbghrl + (1|idschool), data = dnk15dat, weights=c("matwgt","schwgt"))
+
   mm2ref <- structure(c(375.385865901528, -0.553178832770401, 14.9395466422176, 
                         13.8062259868586, 0.378593770436568, 0.994526615735166,
                         27.1896075190162, -1.46114087437972, 15.0217665428432),
@@ -911,8 +914,91 @@ test_that("TIMSS tests", {
   mm1 <- mix(I(asmmat01>450) ~ atbg01 + (1|idschool), data=dnk15dat, weights=c("cwt1_math","cwt2_math"),
              cWeights=TRUE, family=binomial(link="logit"))
   mm1s <- summary(mm1)
-  mm1w <- waldTest(fittedModel=mm1, type="beta", coefs="atbg01")
+  mm1w <- WeMix::waldTest(fittedModel=mm1, type="beta", coefs="atbg01")
  
   expect_equal(mm1s$coef[2,3]^2, mm1w$Wald)
+})
 
+context("ECLSK three level unordered model")
+test_that("ECLSK three level unordered model", {
+  skip_on_cran()
+  skip_if_not_installed("EdSurvey")
+  skip_if_not_installed("tidyr")
+  require(EdSurvey)
+  require(tidyr)
+
+  eclsk11 <- readECLS_K2011(path = paste0(edsurveyHome, "ECLS_K/2011"))
+
+  myDataWide <- EdSurvey::getData(eclsk11, c("childid", "x1mscalk5", "x2mscalk5",
+                                             "x3mscalk5","x4mscalk5", "x5mscalk5", 
+                                             "x6mscalk5", "x7mscalk5", "x8mscalk5",
+                                             "x9mscalk5", "w8cf8p_80", "s2_id", "w2sch0"),
+                                  returnJKreplicates=FALSE)
+  myDataWide <- subset(myDataWide, w8cf8p_80 > 0)
+  myDataWide <- subset(myDataWide, w2sch0 > 0)
+
+  myDataWide$nsch <- ave(rep(1, nrow(myDataWide)), myDataWide$s2_id, FUN=sum)
+
+  # require n students per school; filter by school id for speed
+  myDataWide <- subset(myDataWide, nsch == 10 & s2_id < 1800)
+
+  myDataTall <- gather(data=myDataWide, key="scorevar", value="score",
+                       c("x1mscalk5", "x2mscalk5", "x3mscalk5", 
+                         "x4mscalk5", "x5mscalk5", "x6mscalk5", 
+                         "x7mscalk5", "x8mscalk5", "x9mscalk5") )
+
+  myDataTall$wave <- substr(myDataTall$scorevar, 2, 2)
+
+  myDataTall$calYear <- ifelse(myDataTall$wave==1, 0, NA) # fall 2010 (October)
+  myDataTall$calYear <- ifelse(myDataTall$wave==2, 6, myDataTall$calYear) # Spring 2011 (April)
+  myDataTall$calYear <- ifelse(myDataTall$wave==3, 12, myDataTall$calYear) # Fall 2011 
+  myDataTall$calYear <- ifelse(myDataTall$wave==4, 18, myDataTall$calYear) # Spring 2012
+  myDataTall$calYear <- ifelse(myDataTall$wave==5, 24, myDataTall$calYear) # Fall 2012
+  myDataTall$calYear <- ifelse(myDataTall$wave==6, 30, myDataTall$calYear) # Spring 2013
+  myDataTall$calYear <- ifelse(myDataTall$wave==7, 42, myDataTall$calYear) # Spring 2014
+  myDataTall$calYear <- ifelse(myDataTall$wave==8, 54, myDataTall$calYear) # Spring 2015
+  myDataTall$calYear <- ifelse(myDataTall$wave==9, 66, myDataTall$calYear) # Spring 2016???
+
+  table(myDataTall$wave, myDataTall$calYear,dnn=c("Wave","Calendar Year"), useNA="ifany")
+
+  myDataTall$acaYear <- ifelse(myDataTall$wave==1, 0, NA) # fall 2010 (October)
+  myDataTall$acaYear <- ifelse(myDataTall$wave==2, 6, myDataTall$acaYear) # Spring 2011 (April)
+  myDataTall$acaYear <- ifelse(myDataTall$wave==3, 12-3, myDataTall$acaYear) # Fall 2011 
+  myDataTall$acaYear <- ifelse(myDataTall$wave==4, 18-3, myDataTall$acaYear) # Spring 2012
+  myDataTall$acaYear <- ifelse(myDataTall$wave==5, 24-6, myDataTall$acaYear) # Fall 2012
+  myDataTall$acaYear <- ifelse(myDataTall$wave==6, 30-6, myDataTall$acaYear) # Spring 2013
+  myDataTall$acaYear <- ifelse(myDataTall$wave==7, 42-9, myDataTall$acaYear) # Spring 2014
+  myDataTall$acaYear <- ifelse(myDataTall$wave==8, 54-12, myDataTall$acaYear) # Spring 2015
+  myDataTall$acaYear <- ifelse(myDataTall$wave==9, 66-12, myDataTall$acaYear) # Spring 2016???
+
+  myDataTall$w1c <- 1
+  myDataTall$w2 <- myDataTall$w8cf8p_80
+  myDataTall$w3 <- myDataTall$w2sch0
+  myDataTall$w1 <- myDataTall$w1c * myDataTall$w2
+
+  #write.csv(myDataTall, "myDataTall.csv")
+
+  m1 <- mix(score ~ calYear + (1+calYear|childid) + (1|s2_id), data=myDataTall, verbose=TRUE, weights=c("w1", "w2", "w3"))
+  expect_equal(m1$coef, c(`(Intercept)` = 49.6594791871134, calYear = 1.23043346166935))  
+  expect_equal(m1$lnl, -6258739.70379471)
+
+  sumRef <- structure(c(49.6594791871134, 1.23043346166935, 2.7913905771771, 
+                        0.020424766920315, 17.790229569856, 60.242227804594),
+                      .Dim = 2:3,
+                      .Dimnames = list(c("(Intercept)", "calYear"),
+                                       c("Estimate", "Std. Error", "t value")))
+  
+  expect_equal(summary(m1)$coef, sumRef)
+
+  sumVarDF <- structure(list(grp = c("childid", "childid", "childid", "s2_id", "Residual"),
+                             var1 = c("(Intercept)", "calYear", "(Intercept)", "(Intercept)", NA),
+                             var2 = c(NA, NA, "calYear", NA, NA),
+                             vcov = c(87.9540891469932, 0.0203169310526866, 0.682227179260158, 52.321204750664, 79.1772622305314),
+                             ngrp = c(120, 120, 120, 12, 1080),
+                             level = c(2, 2, 2, 3, 1),
+                             SEvcov = c(20.6124219047353, 0.00775092348656896, 0.234090937293996, 19.9393913552464, 8.61080027941434),
+                             fullGroup = c("childid.(Intercept)", "childid.calYear", "childid.(Intercept)", "s2_id.(Intercept)", "Residual")),
+                         row.names = c(NA, -5L),
+                         class = "data.frame")
+  expect_equal(m1$varDF, sumVarDF) 
 })

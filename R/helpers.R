@@ -36,7 +36,7 @@ summary.WeMixResults <- function(object, ...) {
     }
   } else{
     se <- object$SE
-    re_se <- rep(0,length(x0$vars))
+    re_se <- rep(0, length(x0$vars))
     # build the var mat output from this
     varDF <- x0$varDF
   }

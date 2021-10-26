@@ -10,6 +10,7 @@
 covMat2Cov <- function(covMat) {
   covMat$sdcor <- NULL
   # returnFull- if true return both the variance-covariance matrix and the data frame (in the shape of the variance df from lme) of variance and covariances
+  #             used only in debugging
   # mapped - if mapped is TRUE then variances <.01 are NOT transformed using function exp(var-1)
   # this transformation is continuous and allows more accurate estimation of variances close to 0
   # so mapped defaults  FALSE 

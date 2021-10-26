@@ -467,28 +467,47 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     ref_comps <- names(getME(lme, "cnms"))
     Zlevels <- unique(grp_level[ref_comps])
     
-    weights_list <- lapply(weights, FUN=function(x){x$w})
    
     # group id needs to be incremetally increasing starting at 1
-    # as factor then as numeric should take care of this 
-    group_id_list <- lapply(all_groups, FUN=function(x){as.numeric(as.factor(data[,x]))})
-    group_id <- matrix(unlist(group_id_list), nrow=nrow(data))
+    # as factor then as numeric should take care of this; also store a crosswalk
+    group_id_list <- lapply(all_groups, FUN=function(x){
+      res <- data.frame(data[,x], as.numeric(as.factor(data[,x])))
+      colnames(res) <- c(x, "index")
+      res
+    })
+    # this as one big matrix
+    group_id <- do.call(cbind, group_id_list)
+    cn <- c()
+    # give group_id good names; necessary for : and / to work
     names(all_groups) <- make.names(all_groups)
+    for(i in 1:length(all_groups)) {
+      cn <- c(cn, all_groups[i], paste0(all_groups[i], "_index"))
+    }
+    colnames(group_id) <- cn
+    group_id <- group_id[ , c(all_groups, paste0(all_groups, "_index"))]
+    weights_list <- lapply(1:length(weights), FUN=function(wi) {
+      if(wi == 1) {
+        # sort by incoming index, so no resorting
+        return(weights[[wi]]$w)
+      }
+      # not lowest level, sort by numeric(factor())
+      x <- weights[[wi]]
+      x <- x[order( as.numeric(as.factor(x$index)) ), ]
+      x$w
+    })
     
     # if level >2 then set up conditional weigths
     weights_list_cond <- weights_list
-    # give group_id good names; necessary for : and / to work
-    colnames(group_id) <- names(all_groups)
     if(levels > 2 ){
-      cWeights <- cbind(group_id, data[,weights0])
+      cWeights <- cbind(group_id, data[ , weights0])
       for (level in 1:(levels-1)){
-        cWeights[,weights0[level]] <- cWeights[,weights0[level]]/cWeights[,weights0[level + 1]]
+        cWeights[ , weights0[level]] <- cWeights[ , weights0[level]] / cWeights[ , weights0[level + 1]]
       }
-      weights_list_cond[[1]] <- cWeights[,weights0[1]] #first level weights dont get grouped 
+      weights_list_cond[[1]] <- cWeights[ , weights0[1]] #first level weights dont get grouped 
         
       for (level in 2:levels){
-        # grab the first element (in FUN) and then grab that value (in [,2])
-        weights_list_cond[[level]] <- aggregate(formula(paste0(weights0[level],"~",names(all_groups)[level-1])), data=cWeights, FUN=function(x) x[1])[,2]
+        # grab the first element, sorted as the data came
+        weights_list_cond[[level]] <- cWeights[!duplicated(cWeights[,all_groups[level-1]]), weights0[level]]
       }
     }
     theta <- getME(lme, "theta")
@@ -496,13 +515,15 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     for(i in 1:length(theta1)) {
       theta1[i] <- 1
     }
+    group_id <- group_id[ , c(paste0(all_groups, "_index"), all_groups)]
     bsqG <- devG(y, X, Zlist=Zlist, Zlevels=Zlevels, weights=weights_list, weightsC = weights_list_cond,
-                 groupID=group_id,
+                 groupID = group_id,
                  lmeVarDF = lmeVarDF,
                  v0=theta1)
     if(verbose) {
-      message("Fitting model.")
+      message("Fitting weighted model.")
     }
+
     opt <- bobyqa(fn=bsqG, par=theta)
     
     names(opt$par) <- names(theta)
@@ -538,8 +559,14 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       # names of the thetas, minus the sigma term which we add back manually when needed
       thetaNamesi <- ifelse(is.na(varDFi$var2), paste0(varDFi$grp,".", varDFi$var1), paste0(varDFi$grp, ".", varDFi$var2, ".", varDFi$var1))[-nrow(varDFi)]
       inds <- names(opt$par) %in% thetaNamesi
-      theta_cov_mat <- solve(-1*getHessian(b2(f=bsq, optpar=opt$par, b=bhatq$b, sigma0=bhatq$sigma, inds=inds),
-                                           x=c(opt$par[inds], sigma=bhatq$sigma)))
+      ihes <- -1*getHessian(b2(f=bsq, optpar=opt$par, b=bhatq$b, sigma0=bhatq$sigma, inds=inds),
+                                           x=c(opt$par[inds], sigma=bhatq$sigma))
+      eihes <- eigen(ihes)
+      if(max(eihes$values)/min(eihes$values) <= 400*sqrt(.Machine$double.eps)) {
+        warning("Numerical instability in estimating the standard error of variance terms. Consider the variance term standard errors approximate.")
+        ihes <- nearPD(ihes,  posd.tol=400*sqrt(.Machine$double.eps))$mat
+      }
+      theta_cov_mat <- solve(ihes)
       colnames(theta_cov_mat) <- rownames(theta_cov_mat) <- c(names(opt$par[inds]),"sigma")
       J <- bhatq$Jacobian[rownames(theta_cov_mat), colnames(theta_cov_mat)]
       preVCi <- theta_cov_mat %*% J %*% theta_cov_mat
