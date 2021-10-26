@@ -3,4 +3,5 @@ DS_Store
 # covr results
 public/*
 
-
+# any built file
+\.tar\.gz
