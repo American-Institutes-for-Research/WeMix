@@ -8,7 +8,7 @@ header-includes:
   - \usepackage{bm}
   - \usepackage{amsmath} 
   - \usepackage[utf8]{inputenc}
-  - \usepackage{showlabels}
+
 output:
   pdf_document:
     fig_caption: yes
@@ -20,19 +20,9 @@ vignette: >
 
 # Introduction
 
-Obtaining population estimates for official statistics or doing social science research with hopes of a direct appeal to external validity requires that a population be sampled. That usually means multi-stage probability sampling, with groups drawn, potentially groups in groups, and then individuals. These samples can be analyzed with weighted linear models and variance estimators applied Wolter (year). Another common approach to nested models is to use hierarchical linear models, or a subset of mixed models where the units are entirely nested in groups.
+The `WeMix` package aims to fit a linear mixed model where units are nested inside groups,which may themselves be nested in groups,a model specified by Rabe-Hesketh and Skrondal (2006) and Rabe-Hesketh, Skrondal, and Pickles (2002) for the GLLAMM software. The advantage of fitting the model in nested levels is that survey sampling weights can be incorporated; the pseudo-likelihood,\footnote{For inverse probability of selection survey data, the likelihood is an estimated population likelihood and not an observed likelihood; the typical phrase for this is \textit{pseudo-likelihood}, which applies to every likelihood in this document.} at the top level, is an integral that sums across the top-level groups, weighting each group or unit (in a two-level model) according to sampling weights.
 
-While any likelihood that can be written down can be maximized, efficent calculation is always appreciated by analyists. In particular, the weighted hierarchical linear model has nested integrals that are difficult to compute efficently. For unweighted data, Bates and Pinheiro (1998) show a method of calculation that leaves only a probability density function in the integral, which can be easily integrated as the multiplicative identity, obviating the need for numerical integration.
-
-This paper generalizes the method in Bates and Pinheiro (1998) and the `lme4` package (Bates, Maechler, Bolker, and Walker, 2015) to the weighted case. I am unaware of a description of this and will detail the information available in existing statistical software documentation which tends to simply cite Rabe-Heskety and not provide additional detail on how weighted estimates are formed.
-
-This paper develops the method used to more quickly estimate linear models. These are implemented in the `WeMix` R package. After the derivation, a few example growth curve models are fit with `WeMix`.
-
-# Model 
-
-The model of interest is a linear mixed model where units are nested inside groups, which may themselves be nested in groups, a model specified by Rabe-Hesketh and Skrondal (2006) and Rabe-Hesketh, Skrondal, and Pickles (2002) for the GLLAMM software. The advantage of fitting the model in nested levels is that survey sampling weights can be incorporated; the pseudo-likelihood,\footnote{For inverse probability of selection survey data, the likelihood is an estimated population likelihood and not an observed likelihood; the typical phrase for this is \textit{pseudo-likelihood}, which applies to every likelihood in this document.} at the top level, is an integral that sums across the top-level groups, weighting each group or unit (in a two-level model) according to sampling weights.
-
-At the highest level, the likelihood ($\mathcal{L}$) is a function of the parameters for the random-effect covariance matrix ($\bm{\theta}$), the fixed-effect estimates ($\bm{\beta}$), and the outcomes $\bm{y}$. This equation relates the overall likelihood [$\mathcal{L}(\bm{\theta}, \bm{\beta}; \bm{y})$] to the integral of the likelihoods of the integrals of the top-level units [$\mathcal{L}^{(L)}_{j}(\bm{\theta}, \bm{\beta} ; \bm{y}| \bm{u}^{(L)})$, indexed by $j$]; the top-level unit likelihoods have a superscript $(L)$ to indicate they are for the $L$th (top) level. Here we omit reference to the fixed-effect design matrix $\bm{X} \in \mathbb{R}^{n \times k_x}$ and the random-effect design matrix $\bm{Z}\in \mathbb{R}^{n \times k_z}$, but the likelihood is conditional on those terms as well.
+At the highest level, the likelihood ($\mathcal{L}$) is a function of the parameters for the random-effect covariance matrix ($\bm{\theta}$), the fixed-effect estimates ($\bm{\beta}$), and the outcomes $\bm{y}$. This equation relates the overall likelihood [$\mathcal{L}(\bm{\theta}, \bm{\beta}; \bm{y})$] to the integral of the likelihoods of the integrals of the top-level units [$\mathcal{L}^{(L)}_{j}(\bm{\theta}, \bm{\beta} ; \bm{y}| \bm{u}^{(L)})$, indexed by $j$]; the top-level unit likelihoods have a superscript $(L)$ to indicate they are for the $L$th (top) level. Here we omit reference to the fixed-effect design matrix $\bm{X}$ and the random-effect design matrix $\bm{Z}$, but the likelihood is conditional on those terms as well.
 \begin{align}
 \mathcal{L}(\bm{\theta}, \bm{\beta}; \bm{y}) &= \int g^{(L)}(\bm{u}^{(L)};\bm{\theta}^{(L)})\prod_{j}{ \bigg[\mathcal{L}^{(L)}_{j}(\bm{\theta}, \bm{\beta} ; \bm{y}| \bm{u}^{(L)})\bigg]^{w^{(L)}_{j}}} d\bm{u}^{(L)}
 \end{align}
@@ -52,29 +42,7 @@ where the subscript $i$ is used to indicate that this is the likelihood of the $
 \begin{align}
 \hat {\bm{e}}^{(1)} &= \bm{y} - \bm{X}\hat{\bm{\beta}} - \sum_{l=2}^L \bm{Z}^{(l)}\hat{\bm{u}}^{(l)}  \ 
 \end{align}
-where $\bm{Z}^{(l)} \in \mathbb{R}^{n \times k_z^{(l)}}$ are block matrixes that form $\bm{Z}$
-
-\begin{align}
-\bm{Z} = \left[ \bm{Z}^{(2)}, ..., \bm{Z}^{(L)} \right]
-\end{align}
-
 When solved with the above integrals (as in Rabe-Hesketh et al., 2002), $\sigma$ is fit as a parameter and there is no direct equation for it.
-
-## Meaning of weights
-
-The weights used in these models are typically not the inverse selection probabilities. This would fit the random effect variances as if the data had been imputed to a sample the size of the population.
-
-Instead the weights are often adjusted to capture both the unequal selection probabilities and total sample size. These  methods are documented in Pfeffermann, Skinner, Holmes, Goldstein, & Rasbash (1998) and Rabe-Hesketh & Skrondal (2006), and other places.
-
-Typically, the difference between weights that are interpretable as sampling and precision weights shows up only in variance estimation. However, I'll document later that the `lme4' and `WeMix` weights result in different estimates. This is because `WeMix` uses the formulas in this paper that weight both the units as well as the groups.
-
-# Existing literature
-
-The SAS manual is often a source of exhaustive documentation of implementation but this author cannot find any indication that these methods are used by SAS at in the PROC GLIMMIX procedure documentation, "Pseudo-likelihood Estimation for Weighted Multilevel Models."
-
-I would commend the authors of the Stata manuals for routinely producing extensive documentation on methods and formulas of their software. Uncharacteristicly, in the case of weighted HLM they simply state, "Weighted estimation is achieved through incorporating $w_j$ and $w_{i|j}$ into the matrix decomposition methods detailed above to reflect replicated clusters for $w_j$ and replicated observations within clusters for $w_{i|j}$. (Stata, page 534)"\footnote{See "Methods and Formulas" for "mixed---Multilevel mixed-effects linear regression" in "[ME] Stata Multilevel mixed-effects reference manual: release 17."}
-
-## Unweighted case
 
 This document describes how `WeMix` uses symbolic integration that relies on a mix of both Bates and Pinheiro (1998) and the `lme4` package (Bates, Maechler, Bolker, and Walker, 2015), obviating the need for numerical integration in a weighted, nested model.
 
@@ -94,8 +62,21 @@ where the $f_{\bm{U}}$ term is analogous to $g(\bm{u}^{(l)})$ in the Rabe-Hesket
 
 In this document we show how `WeMix` uses a derivation similar to that in Bates et al. (2015) and Bates and Pinheiro (1998) to fit a sample-weighted mixed model, avoiding the integration necessary in GLLAMM. Comparing `WeMix` to `lmer`, the latter is more general in the sense of allowing crossed terms, while `WeMix` allows for sampling weights; unweighted, the models should agree.
 
+Generally, the Rabe-Hesketh et al. (2006) model can be rewritten in a form very similar to `lme4` as
+\begin{align} 
+\left( \bm{y}|\bm{U}=\bm{u}\right) &\sim  T_1^{\omega^{(1)}} \label{eq:WeMixA}\\
+\bm{U} &\sim T_2^{\omega^{(2)}} * T_3^{\omega^{(3)}} * \cdots * T_L^{\omega^{(L)}} \label{eq:WeMixB} 
+\end{align}
+where $T^k$ represents the convolution of $k$ instances of $T$ and $*$ represents the convolution of two distributions, with a likelihood that is their product; $w^{(l)}$ are the weights assigned to units ($l=1$) or groups ($l>1$) that are ideally\footnote{This weight is only ideally this because of how weights are adjusted for total nonresponse (see Gelman 2007).} the inverse (unconditional) probability of selecting the unit or group; and the $T$s have distribution
+\begin{align} 
+T_1 &\sim N(\bm{X\beta} + \bm{Zu}, \sigma^2 I ) \label{eq:WeMixA2} \\
+T_l &\sim N(0, \bm{\Sigma_{ll}}) \quad l=2, \cdots, L \label{eq:WeMixB2}
+\end{align}
+where $\bm{\Sigma}$ is block diagonal, disallowing nonzero prior correlations across levels, with the $l$th block being written $\bm{\Sigma}_{ll}$.
 
 The next section follows Bates et al. (2015) and shows the `lme4` and `WeMix` model without weights---the only case where they are identical. The subsequent section then shows the adaptations to the likelihood for the sample weighted case. Notably, `lme4` has unit-level weights, but they are precision weights and not level-1 sample weights, so even when only the level-1 weights are nontrivial, the models disagree. The final section describes the application of the profile likelihood (again, following `lme4`) used to estimate linear models in `WeMix`.
+
+\subsection{Unweighted Case}
 
 Following the logic of Bates et al. (2015), the unweighted (unit weight) case simplifies eqs. \ref{eq:WeMixA} and \ref{eq:WeMixB} to
 \begin{align} 
@@ -131,7 +112,7 @@ and will be written this way to keep track of the parameters involved. These par
 
 Then, the residual (penalized) sum of squares is (Bates et al., 2015, eqs. 14 and 15)
 \begin{align} 
-r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) &= \lvert\lvert \bm{y}-\bm{X\beta} - \bm{Z\Lambda(\theta)\upsilon}\rvert\rvert^2 + ||\bm{\upsilon}||^2 \label{eq:pseudoSS}
+r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) &= \lvert\lvert \bm{y}-\bm{X\beta} - \bm{Z\Lambda(\theta)\upsilon}\rvert\rvert^2 + ||\bm{\upsilon}||^2
 \end{align} 
 where $||\bm{v}||^2$ is the sum of squares for the vector $\bm{v}$; as an equation, $||\bm{v}||^2=\sum v_i^2$.
 
@@ -143,13 +124,13 @@ Unlike Bates et al. (2015, eq. 16), we proceed by taking a QR decomposition (Tre
 \begin{align} 
 \bm{A} &\equiv \left[ \begin{matrix} \bm{Z\Lambda}(\bm{\theta}) & \bm{X} \\ \bm{I} & \bm{0} \end{matrix} \right] \label{eq:uwA}
 \end{align} 
-Plugging eq. \ref{eq:uwA} into eq. \ref{eq:WeMixR0} and finding the least squares solution to
+Plugging eq. \ref{eq:uwA} into eq. \ref{eq:WeMixR0} and finding the least squares solution (denoted with a hat: $\bm{\hat{u}}$ and $\bm{\hat{\beta}}$)
 \begin{align} 
-\bm{A} \left[ \begin{matrix} \bm{\upsilon} \\ \bm{\beta} \end{matrix} \right]&=\left[ \begin{matrix} \bm{y} \\ \bm{0} \end{matrix} \right] \label{eq:lsqnolsq}
+\bm{A} \left[ \begin{matrix} \hat{\bm{\upsilon}} \\ \hat{\bm{\beta}} \end{matrix} \right]&=\left[ \begin{matrix} \bm{y} \\ \bm{0} \end{matrix} \right]
 \end{align}
 using the QR decomposition on $\bm{A}$, which rewrites $\bm{A}=\bm{QR}$ for an orthogonal matrix $\bm{Q}$ (So, $\bm{Q}^T\bm{Q}=\bm{I}$) and an upper triangular matrix $\bm{R}$,
 \begin{align}
-\bm{QR} \left[ \begin{matrix} \bm{\upsilon} \\ \bm{\beta} \end{matrix} \right]&=\left[ \begin{matrix} \bm{y} \\ \bm{0} \end{matrix} \right]
+\bm{QR} \left[ \begin{matrix} \hat{\bm{\upsilon}} \\ \hat{\bm{\beta}} \end{matrix} \right]&=\left[ \begin{matrix} \bm{y} \\ \bm{0} \end{matrix} \right]
 \end{align} 
 where $\bm{R}$ can be written in block form as
 \begin{align}
@@ -163,7 +144,7 @@ r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) &= \left| \left| \left[ \begin{matri
 &= \left| \left|  \left[ \begin{matrix} \bm{y} \\ \bm{0} \end{matrix} \right] - \bm{A} \left[ \begin{matrix} \bm{\upsilon} - \hat{\bm{\upsilon}} + \hat{\bm{\upsilon}} \\ \bm{\beta} - \hat{\bm{\beta}} + \hat{\bm{\beta}} \end{matrix} \right] \right|\right|^2 \\
 &= \left| \left|  \left[ \begin{matrix} \bm{y} \\ \bm{0} \end{matrix} \right] - \bm{A} \left[ \begin{matrix}\hat{\bm{\upsilon}} \\ \hat{\bm{\beta}} \end{matrix} \right] - \bm{A} \left[ \begin{matrix} \bm{\upsilon} - \hat{\bm{\upsilon}} \\ \bm{\beta} - \hat{\bm{\beta}} \end{matrix} \right] \right|\right|^2
 \end{align}
-Where $\bm{\hat{u}}$ and $\bm{\hat{\beta}}$ are the least squares solution to eq. \ref{eq:lsqnolsq}. Using the identity that for any vector $\bm{v}$ the sum of squares is also just the inner product, so $||\bm{v}||^2 = \bm{v}^T\bm{v}$,  
+Using the identity that for any vector $\bm{v}$ the sum of squares is also just the inner product, so $||\bm{v}||^2 = \bm{v}^T\bm{v}$,  
 \begin{align}
 r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon})&= \left[  \left[ \begin{matrix} \bm{y} \\ \bm{0} \end{matrix} \right] - \bm{A} \left[ \begin{matrix}\hat{\bm{\upsilon}} \\ \hat{\bm{\beta}} \end{matrix} \right] - \bm{A} \left[ \begin{matrix} \bm{\upsilon} - \hat{\bm{\upsilon}} \\ \bm{\beta} - \hat{\bm{\beta}} \end{matrix} \right] \right]^T    \left[ \left[ \begin{matrix} \bm{y} \\ \bm{0} \end{matrix} \right] - \bm{A} \left[ \begin{matrix}\hat{\bm{\upsilon}} \\ \hat{\bm{\beta}} \end{matrix} \right] - \bm{A} \left[ \begin{matrix} \bm{\upsilon} - \hat{\bm{\upsilon}} \\ \bm{\beta} - \hat{\bm{\beta}} \end{matrix} \right] \right] \label{eq:finalT}
 \end{align}
@@ -199,22 +180,18 @@ r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon})  &= r^2(\bm{\theta}, \bm{\hat{\beta}
 
 From the joint distribution of $\bm{y}$ and $\bm{\upsilon}$ (Bates et al., 2015, eqs. 20, 21, and 22),
 \begin{align}
-(\bm{y},\bm{\upsilon}) &\sim N(\bm{y} - \bm{X\beta} - \bm{Z\upsilon},\sigma^2 \bm{I}_{n}) * N(\bm{\upsilon},  \sigma^2 \bm{I}_{k_z})
+(\bm{y},\bm{\upsilon}) &\sim N(\bm{y} - \bm{X\beta} - \bm{Z\upsilon},\sigma^2 \bm{I}_{n_x}) * N(\bm{\upsilon},  \sigma^2 \bm{I}_{n_z})
 \end{align}
 and the probability density function of the joint distribution of $\bm{y}$ and $\bm{\upsilon}$ is
 \begin{align}
-f_{\bm{y}, \bm{\upsilon}} \left(\bm{y}, \bm{\upsilon}, \bm{\beta}, \bm{\theta}, \sigma^2 \right)&= \frac{1}{\left(2\pi\sigma^2\right)^{\frac{n}{2}}} \exp{\left[\frac{- (\bm{y} - \bm{X\beta} - \bm{Z\upsilon})^2 }{2\sigma^2} \right]}  \cdot \frac{1}{\left(2\pi\sigma^2\right)^{\frac{k_z}{2}}} \exp{\left[ \frac{-||\bm{\upsilon}||^2}{2\sigma^2}\right] } 
-\end{align}
-pluggin in eq. \ref{eq:pseudoSS}
-\begin{align}
-f_{\bm{y}, \bm{\upsilon}} \left(\bm{y}, \bm{\upsilon}, \bm{\beta}, \bm{\theta}, \sigma^2 \right)&=&= \frac{1}{\left(2\pi\sigma^2\right)^{\frac{n}{2}}} \exp{\left[\frac{-r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) + ||\upsilon||^2}{2\sigma^2} \right]}  \cdot \frac{1}{\left(2\pi\sigma^2\right)^{\frac{k_z}{2}}} \exp{\left[ \frac{-||\bm{\upsilon}||^2}{2\sigma^2}\right] }  \\
-&= \frac{1}{\left(2\pi\sigma^2\right)^{\frac{n+k_z}{2}}} \exp{\left[\frac{-r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) }{2\sigma^2}\right] } 
+f_{\bm{y}, \bm{\upsilon}} \left(\bm{y}, \bm{\upsilon}, \bm{\beta}, \bm{\theta}, \sigma^2 \right)&= \frac{1}{\left(2\pi\sigma^2\right)^{\frac{n_x}{2}}} \exp{\left[\frac{-r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) + ||\upsilon||^2}{2\sigma^2} \right]}  \cdot \frac{1}{\left(2\pi\sigma^2\right)^{\frac{n_z}{2}}} \exp{\left[ \frac{-||\bm{\upsilon}||^2}{2\sigma^2}\right] }  \\
+&= \frac{1}{\left(2\pi\sigma^2\right)^{\frac{n_x+n_z}{2}}} \exp{\left[\frac{-r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) }{2\sigma^2}\right] } 
 \end{align}
 This can then be integrated over $\bm{\upsilon}$ to get the likelihood of the model (Bates et al., 2015, eqs. 25 and 26):
 \begin{align}
 \mathcal{L}\left( \bm{\beta}, \bm{\theta}, \sigma^2; \bm{y} \right)&=\int f_{\bm{y}, \bm{\upsilon}} \left(\bm{y}, \bm{\upsilon}, \bm{\beta}, \bm{\theta}\right) d\bm{\upsilon}\\
-&=\int \frac{1}{\left(2\pi\sigma^2\right)^{\frac{n+k_z}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) }{2\sigma^2} }  d\bm{\upsilon}\\
-&=\frac{1}{\left(2\pi\sigma^2\right)^{\frac{n+k_z}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) - \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} } \int \exp{\frac{- \left|\left|  \bm{R}_{11} (\bm{\upsilon} - \hat{\bm{\upsilon}}) + \bm{R}_{12}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} }  d\bm{\upsilon} \label{eq:lnlInt}
+&=\int \frac{1}{\left(2\pi\sigma^2\right)^{\frac{n_x+n_z}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\beta}, \bm{\upsilon}) }{2\sigma^2} }  d\bm{\upsilon}\\
+&=\frac{1}{\left(2\pi\sigma^2\right)^{\frac{n_x+n_z}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) - \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} } \int \exp{\frac{- \left|\left|  \bm{R}_{11} (\bm{\upsilon} - \hat{\bm{\upsilon}}) + \bm{R}_{12}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} }  d\bm{\upsilon} \label{eq:lnlInt}
 \end{align}
 This can be solved with a change of variables (Bates et al., 2015, eq. 27):
 \begin{align}
@@ -223,48 +200,35 @@ This can be solved with a change of variables (Bates et al., 2015, eq. 27):
 \end{align}
 Using the change of variables formula,\footnote{See the section, ``Substitution for Multiple Variables'' in ``Integration by Substitution'' (Wikipedia, n.d.).} we add the inverse determinant of $\bm{R}_{11}$ when plugging eq. \ref{eq:gamma} into \ref{eq:lnlInt}, and using eq. \ref{eq:Jgamma} (Bates et al., 2015, eq. 28):
 \begin{align}
-\mathcal{L}\left( \bm{\beta}, \bm{\theta}, \sigma^2; \bm{y} \right)&=\frac{1}{\left(2\pi\sigma^2\right)^{\frac{n+k_z}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) - \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} } \int \exp{\frac{- \left|\left|  \gamma  \right| \right|^2 }{2\sigma^2} } | {\rm det} (\bm{R}_{11}) |^{-1} d\bm{\gamma} \\
-&=\frac{1}{|{\rm det}(\bm{R}_{11})| \left(2\pi\sigma^2\right)^{ \frac{n}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) - \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} }  \left\{ \frac{1}{\left(2\pi\sigma^2\right)^{ \frac{k_z}{2}} } \int \exp{\frac{- \left|\left|  \gamma  \right| \right|^2 }{2\sigma^2} }  d\bm{\gamma} \right\}
+\mathcal{L}\left( \bm{\beta}, \bm{\theta}, \sigma^2; \bm{y} \right)&=\frac{1}{\left(2\pi\sigma^2\right)^{\frac{n_x+n_z}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) - \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} } \int \exp{\frac{- \left|\left|  \gamma  \right| \right|^2 }{2\sigma^2} } | {\rm det} (\bm{R}_{11}) |^{-1} d\bm{\gamma} \\
+&=\frac{1}{|{\rm det}(\bm{R}_{11})| \left(2\pi\sigma^2\right)^{ \frac{n_x}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) - \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} }  \left\{ \frac{1}{\left(2\pi\sigma^2\right)^{ \frac{n_z}{2}} } \int \exp{\frac{- \left|\left|  \gamma  \right| \right|^2 }{2\sigma^2} }  d\bm{\gamma} \right\}
 \end{align}
-and because the term in curly braces is now of a probability density function, it integrates to unity
+and because the term in curly braces is now of a probability density function, it integrates to 1:
 \begin{align}
-\mathcal{L} \left( \bm{\beta}, \bm{\theta}, \sigma^2; \bm{y} \right)&=\frac{1}{|{\rm det}(\bm{R}_{11})| \left(2\pi\sigma^2\right)^{\frac{n}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) - \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} }  \label{eq:WeMixL0}
+\mathcal{L} \left( \bm{\beta}, \bm{\theta}, \sigma^2; \bm{y} \right)&=\frac{1}{|{\rm det}(\bm{R}_{11})| \left(2\pi\sigma^2\right)^{\frac{n_x}{2}}} \exp{\frac{-r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) - \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{2\sigma^2} }  \label{eq:WeMixL0}
 \end{align}
 Having solved the integral symbolically, this expression for the likelihood no longer has an explicit integral and has been calculated exactly, without use of numerical quadrature. This derivation is incredibly close to Bates et al. (2015), with the only modification being that we use the QR decomposition of $\bm{A}$ where they used the Cholesky decomposition of $\bm{A}^T \bm{A}$.
 
-The deviance function ($D(\cdot) \equiv -2\ell(\cdot)$), 
+This makes a deviance function, defined relative to the log-likelihood ($\ell$), so that $D(\cdot) = -2\ell(\cdot)$, 
 \begin{align}
-D \left( \bm{\beta}, \bm{\theta}, \sigma^2; \bm{y} \right)&= 2\,{\rm ln} {|{\rm det}(\bm{R}_{11})|} + n {\rm ln} \left(2\pi\sigma^2\right) + \frac{r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) + \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{\sigma^2}  \label{eq:WeMixD0} 
+D \left( \bm{\beta}, \bm{\theta}, \sigma^2; \bm{y} \right)&= 2\,{\rm ln} {|{\rm det}(\bm{R}_{11})|} + n_x {\rm ln} \left(2\pi\sigma^2\right) + \frac{r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) + \left|\left|  \bm{R}_{22}  (\bm{\beta} - \hat{\bm{\beta}})  \right| \right|^2 }{\sigma^2}  \label{eq:WeMixD0} 
 \end{align}
 
 Using the profile likelihood, the deviance is minimized when $\bm{\beta}=\hat{\bm{\beta}}$ because $\bm{\beta}$ only appears inside of a sum of squares that can be minimized (set to zero) using $\bm{\beta}=\hat{\bm{\beta}}$ (Bates et al., 2015, eqs. 30 and 31). The profile deviance then becomes
 \begin{align}
-D \left( \bm{\theta}, \sigma^2; \bm{y} \right)&= 2\,{\rm ln} {|{\rm det}(\bm{R}_{11})|} + n {\rm ln} \left(2\pi\sigma^2\right) + \frac{r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) }{\sigma^2}  
+D \left( \bm{\theta}, \sigma^2; \bm{y} \right)&= 2\,{\rm ln} {|{\rm det}(\bm{R}_{11})|} + n_x {\rm ln} \left(2\pi\sigma^2\right) + \frac{r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}}) }{\sigma^2}  
 \end{align}
 Similarly, the value of $\sigma^2$ can be found by taking the derivative of the profile deviance with respect to $\sigma^2$ and setting it equal to zero. This yields
 \begin{align}
-\widehat{\sigma^2}&= \frac{r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}})}{n}  
+\widehat{\sigma^2}&= \frac{r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}})}{n_x}  
 \end{align}
 giving a profile deviance that is a function only of the parameter $\bm{\theta}$:
 \begin{align}
-D \left( \bm{\theta}; \bm{y} \right)&= 2\,{\rm ln} {|{\rm det}(\bm{R}_{11})|} + n \left({\rm ln} \left(2\pi \widehat{\sigma^2}\right) + 1 \right)
+D \left( \bm{\theta}; \bm{y} \right)&= 2\,{\rm ln} {|{\rm det}(\bm{R}_{11})|} + n_x \left({\rm ln} \left(2\pi \widehat{\sigma^2}\right) + 1 \right)
 \end{align}
-the profiled deviance can then be numerically maximixed over the parameters in $\bm{\theta}$ and the plug in estimators can then be used for $\hat{\sigma^2}$ and $\bm{\beta}$.
 
-# Weighted Case 
 
-Generally, the Rabe-Hesketh et al. (2006) model can be rewritten in a form very similar to `lme4` as
-\begin{align} 
-\left( \bm{y}|\bm{U}=\bm{u}\right) &\sim  T_1^{\omega^{(1)}} \label{eq:WeMixA}\\
-\bm{U} &\sim T_2^{\omega^{(2)}} * T_3^{\omega^{(3)}} * \cdots * T_L^{\omega^{(L)}} \label{eq:WeMixB} 
-\end{align}
-where $T^k$ represents the convolution of $k$ instances of $T$ and $*$ represents the convolution of two distributions, with a likelihood that is their product; $w^{(l)}$ are the weights assigned to units ($l=1$) or groups ($l>1$) that are ideally\footnote{This weight is only ideally this because of how weights are adjusted for total nonresponse (see Gelman 2007).} the inverse (unconditional) probability of selecting the unit or group; and the $T$s have distribution
-\begin{align} 
-T_1 &\sim N(\bm{X\beta} + \bm{Zu}, \sigma^2 I ) \label{eq:WeMixA2} \\
-T_l &\sim N(0, \bm{\Sigma_{ll}}) \quad l=2, \cdots, L \label{eq:WeMixB2}
-\end{align}
-where $\bm{\Sigma}$ is block diagonal, disallowing nonzero prior correlations across levels, with the $l$th block being written $\bm{\Sigma}_{ll}$.
-
+\section{Weighted Case}
 The purpose of `WeMix` is to estimate the likelihood of the weighted model (eqs. \ref{eq:WeMixA} and \ref{eq:WeMixB}). In this section we derive the weighted estimator that is analogous to the estimator used by `lme4` and is similar to Henderson (1982) but we include a deviance (and likelihood), which Henderson omits.
 
 The first difference is in the penalized sum of squares, which now weights the residuals by the unit-level weights ($\bm{\Omega}$) and the random-effect penalties by the group-level weights ($\bm{\Psi}$):
@@ -289,17 +253,17 @@ $\bm{\Lambda}(\bm{\theta})$ is a block diagonal matrix with elements $\bm{\Lambd
 
 The likelihood of $\bm{y}$, conditional on $\bm{\upsilon}$ is then
 \begin{align}
-f_{\bm{y}|\bm{\upsilon}=\bm{\upsilon}}(\bm{y}, \bm{\upsilon}) &= \prod_{i=1}^{n} \left[ {\frac{1}{\left(2\pi\sigma^2\right)^{\frac{1}{2}}} \exp\left( -\frac{\left|\left|\bm{y}_i-\bm{X}_i\bm{\beta}-\bm{Z}_i\bm{\Lambda}(\bm{\theta})\bm{\upsilon} \right|\right|^2}{2\sigma^2}\right) } \right]^{\bm{\Omega}_{ii}} \\
- &= \prod_{i=1}^{n}  {\frac{1}{\left(2\pi\sigma^2\right)^{\frac{\bm{\Omega}_{ii}}{2}}} \exp \left(- \frac{ \left|\left| \bm{\Omega}_{ii}^{\frac{1}{2}} \left(\bm{y}_i-\bm{X}_i\bm{\beta}-\bm{Z}_i\bm{\Lambda}(\bm{\theta})\bm{\upsilon} \right) \right|\right|^2}{2\sigma^2}\right) } \\
+f_{\bm{y}|\bm{\upsilon}=\bm{\upsilon}}(\bm{y}, \bm{\upsilon}) &= \prod_{i=1}^{n_x} \left[ {\frac{1}{\left(2\pi\sigma^2\right)^{\frac{1}{2}}} \exp\left[-\frac{\left|\left|\bm{y}_i-\bm{X}_i\bm{\beta}-\bm{Z}_i\bm{\Lambda}(\bm{\theta})\bm{\upsilon} \right|\right|^2}{2\sigma^2}\right) } \right]^{\bm{\Omega}_{ii}} \\
+ &= \prod_{i=1}^{n_x}  {\frac{1}{\left(2\pi\sigma^2\right)^{\frac{\bm{\Omega}_{ii}}{2}}} \exp \left(- \frac{ \left|\left| \bm{\Omega}_{ii}^{\frac{1}{2}} \left(\bm{y}_i-\bm{X}_i\bm{\beta}-\bm{Z}_i\bm{\Lambda}(\bm{\theta})\bm{\upsilon} \right) \right|\right|^2}{2\sigma^2}\right) } \\
  &= {\frac{1}{\left(2\pi\sigma^2\right)^{\frac{\sum_i \bm{\Omega}_{ii}}{2}}} \exp \left( - \frac{ \left|\left|\bm{\Omega}^{\frac{1}{2}} \left(\bm{y}-\bm{X}\bm{\beta}-\bm{Z}\bm{\Lambda}(\bm{\theta})\bm{\upsilon} \right) \right|\right|^2}{2\sigma^2}\right) } \label{eq:WeMixWfyu}
 \end{align}
 And the unconditional density of $\bm{\upsilon}$ is
 \begin{align}
-f_{\bm{\upsilon}}(\bm{\upsilon}) &=\prod_{j=1}^{k_z} \left[ \frac{1}{\left(2\pi\sigma^2\right)^{\frac{1}{2}}} \exp \left[- \frac{ \left|\left|  \bm{\upsilon}_j \right|\right|^2}{2\sigma^2}\right]  \right]^{\bm{\Psi}_{jj}} \\
-&=\prod_{j=1}^{k_z} \frac{1}{\left(2\pi\sigma^2\right)^{\frac{1}{2}||\bm{\Psi}_{jj}||_F}} \exp \left[- \frac{ \left|\left| \bm{\Psi}_{jj}^{\frac{1}{2}}  \bm{\upsilon}_j \right|\right|^2}{2\sigma^2}\right] \\
-&= \frac{1}{\left(2\pi\sigma^2\right)^{\frac{1}{2}||\bm{\Psi}_{jj}}||_F} \exp \left[- \frac{ \left|\left|  \bm{\Psi}^{\frac{1}{2}}  \bm{\upsilon} \right|\right|^2}{2\sigma^2}\right] \label{eq:WeMixWfu}
+f_{\bm{\upsilon}}(\bm{\upsilon}) &=\prod_{j=1}^{n_z} \left[ \frac{1}{\left(2\pi\sigma^2\right)^{\frac{1}{2}}} \exp \left[- \frac{ \left|\left|  \bm{\upsilon}_j \right|\right|^2}{2\sigma^2}\right]  \right]^{\bm{\Psi}_{jj}} \\
+&=\prod_{j=1}^{n_z} \frac{1}{\left(2\pi\sigma^2\right)^{\frac{\bm{\Psi}_{jj}}{2}}} \exp \left[- \frac{ \left|\left| \bm{\Psi}_{jj}^{\frac{1}{2}}  \bm{\upsilon}_j \right|\right|^2}{2\sigma^2}\right] \\
+&= \frac{1}{\left(2\pi\sigma^2\right)^{\frac{\sum_j \bm{\Psi}_{jj}}{2}}} \exp \left[- \frac{ \left|\left|  \bm{\Psi}^{\frac{1}{2}}  \bm{\upsilon} \right|\right|^2}{2\sigma^2}\right] \label{eq:WeMixWfu}
 \end{align}
-where $||\cdot||_F$ is the Frobenius norm of a matrix, or the sum of all its elements.
+where $\sum \bm{\Psi}_{jj}$ is the sum of the terms in the diagonal matrix $\bm{\Psi}$.
 
 The joint distribution of $\bm{\upsilon}$ and $\bm{y}$ is then the product of eqs. \ref{eq:WeMixWfyu} and \ref{eq:WeMixWfu}:
 \begin{align}
@@ -318,7 +282,7 @@ Now, finding the integral of this over $\bm{\upsilon}$,
 &=\int \frac{1}{\left(2\pi\sigma^2\right)^{\frac{\sum_i \bm{\Omega}_{ii} + \sum_j \bm{\Psi}_{jj}}{2}}} \exp \left[- \frac{ r^2(\bm{\theta}, \hat{\bm{\beta}}, \hat{\bm{\upsilon}}) - \left| \left| \bm{R}_{22}(\bm{\beta} - \hat{\bm{\beta}})\right| \right|^2 - \left| \left| \bm{R}_{11}(\bm{\upsilon} - \hat{\bm{\upsilon}}) + \bm{R}_{12}(\bm{\beta} - \hat{\bm{\beta}}) \right| \right|^2}{2\sigma^2} \right] d\bm{\upsilon} \\
 &=\frac{1}{\left(2\pi\sigma^2\right)^{\frac{\sum_i \bm{\Omega}_{ii} + \sum_j \bm{\Psi}_{jj}}{2}}} \exp \left[- \frac{ r^2(\bm{\theta}, \hat{\bm{\beta}}, \hat{\bm{\upsilon}}) - \left| \left| \bm{R}_{22}(\bm{\beta} - \hat{\bm{\beta}})\right| \right|^2 }{2\sigma^2}\right] \int \exp \left[- \frac{\left| \left|  \bm{R}_{11}(\bm{\upsilon} - \hat{\bm{\upsilon}}) + \bm{R}_{12}(\bm{\beta} - \hat{\bm{\beta}}) \right| \right|^2}{2\sigma^2} \right] d\bm{\upsilon} \label{eq:tmpLA}
 \end{align}
-Notice that while the unweighted integral has $k_z$ dimensions, this weighted integral has $\sum_j \bm{\Psi}_{jj}$ dimensions---the number of (population) individuals values to integrate out.
+Notice that while the unweighted integral has $n_z$ dimensions, this weighted integral has $\sum_j \bm{\Psi}_{jj}$ dimensions---the number of (population) individuals values to integrate out.
 \begin{align}
 \mathcal{L}(\bm{\beta}, \bm{\theta}, \sigma^2; \bm{y})
 &=\frac{1}{\left(2\pi\sigma^2\right)^{\frac{\sum_i \bm{\Omega}_{ii}}{2}}} \exp \left[- \frac{ r^2(\bm{\theta}, \hat{\bm{\beta}}, \hat{\bm{\upsilon}}) - \left| \left| \bm{R}_{22}(\bm{\beta} - \hat{\bm{\beta}})\right| \right|^2 }{2\sigma^2}\right] \\ & \left\{ \frac{1}{(2\pi\sigma^2)^{\frac{\sum_j \bm{\Psi}_{jj}}{2}}} \int \exp \left[- \frac{\left| \left|  \bm{R}_{11}(\bm{\upsilon} - \hat{\bm{\upsilon}}) + \bm{R}_{12}(\bm{\beta} - \hat{\bm{\beta}}) \right| \right|^2}{2\sigma^2} \right] d\bm{\upsilon} \right\} \label{eq:tmpLB}
@@ -439,7 +403,7 @@ The actual implementation of the calculation is slightly different from what is 
 
 Also note that, in the above, the value of $r^2$ was never used, so the components relating to $\bm{y}$ and $\bm{X}$ need not be formed.
 
-## Estimation
+\section{Estimation}
 Continuing to follow `lme4`, the estimation uses the profile likelihood. Since $\bm{\beta}$ appears only in the final term in quadratic form, it is immediately evident that the maximum likelihood estimator (MLE) for $\bm{\beta}$ is $\hat{\bm{\beta}}$, making eq. \ref{eq:tmpL2} profile to
 \begin{align}
 D \left( \bm{\theta}, \sigma^2; \bm{y} \right)&= 2\,\rm{ln} \left(\alpha (\bm{\theta};\bm{\Psi},\bm{\Omega}) \right) + \left(\sum_i \bm{\Omega}_{ii} \right) \rm{ln} \left(2\pi\sigma^2\right) + \frac{r^2(\bm{\theta}, \bm{\hat{\beta}}, \bm{\hat{\upsilon}})}{\sigma^2} \label{eq:WeMixPB} 
@@ -461,7 +425,7 @@ This function is then minimized numerically with respect to $\bm{\theta}$, using
 
 The estimated values are then the $\bm{\theta}$ that maximize eq. \ref{eq:WeMixP}, the $\sigma^2$ value from eq. \ref{eq:WeMixMaxs2}, and the $\bm{\beta}$ values from solving the system of equations in eq. \ref{eq:WeMixWr2}.
 
-## Variance Estimation
+# Variance Estimation
 
 The inverse Hessian of $\bm{\beta}$ is given by (Bates et al., 2015, eq. 54):
 \begin{align}

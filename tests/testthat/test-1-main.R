@@ -17,7 +17,7 @@ sleepstudyU$weight1L2 <- 1
 
 context("The model runs")
 test_that("The model runs", {
-  system.time(wm0 <- mix(Reaction ~ Days + (1|Subject), data=sleepstudyU, weights=c("weight1L1", "weight1L2")))
+  wm0 <- mix(Reaction ~ Days + (1|Subject), data=sleepstudyU, weights=c("weight1L1", "weight1L2"))
   lme1 <- lmer(Reaction ~ Days + (1|Subject), data=sleepstudyU, REML=FALSE)
   expect_equal(wm0$lnl, -897.039321502613, tolerance=tolerance*897) # value from  lmer(Reaction ~ Days + (1 | Subject), data=sleepstudy, REML=FALSE)
   expect_equal(unname(c(wm0$coef)), unname(fixef(lme1)), tolerance=tolerance)
@@ -978,8 +978,9 @@ test_that("ECLSK three level unordered model", {
 
   #write.csv(myDataTall, "myDataTall.csv")
 
-  m1 <- mix(score ~ calYear + (1+calYear|childid) + (1|s2_id), data=myDataTall, verbose=TRUE, weights=c("w1", "w2", "w3"))
-  expect_equal(m1$coef, c(`(Intercept)` = 49.6594791871134, calYear = 1.23043346166935))  
+  # sometimes this gives a warning, but not always. The important part is the results.
+  suppressWarnings(m1 <- mix(score ~ calYear + (1+calYear|childid) + (1|s2_id), data=myDataTall, verbose=FALSE, weights=c("w1", "w2", "w3")))
+  expect_equal(m1$coef, c(`(Intercept)` = 49.6594791871134, calYear = 1.23043346166935), tolerance=200*sqrt(.Machine$double.eps))  
   expect_equal(m1$lnl, -6258739.70379471)
 
   sumRef <- structure(c(49.6594791871134, 1.23043346166935, 2.7913905771771, 
@@ -988,7 +989,7 @@ test_that("ECLSK three level unordered model", {
                       .Dimnames = list(c("(Intercept)", "calYear"),
                                        c("Estimate", "Std. Error", "t value")))
   
-  expect_equal(summary(m1)$coef, sumRef)
+  expect_equal(summary(m1)$coef, sumRef, tolerance = (.Machine$double.eps)^0.25)
 
   sumVarDF <- structure(list(grp = c("childid", "childid", "childid", "s2_id", "Residual"),
                              var1 = c("(Intercept)", "calYear", "(Intercept)", "(Intercept)", NA),
@@ -998,7 +999,7 @@ test_that("ECLSK three level unordered model", {
                              level = c(2, 2, 2, 3, 1),
                              SEvcov = c(20.6124219047353, 0.00775092348656896, 0.234090937293996, 19.9393913552464, 8.61080027941434),
                              fullGroup = c("childid.(Intercept)", "childid.calYear", "childid.(Intercept)", "s2_id.(Intercept)", "Residual")),
-                         row.names = c(NA, -5L),
+                         row.names = c(NA, -5L),f
                          class = "data.frame")
-  expect_equal(m1$varDF, sumVarDF) 
+  expect_equal(m1$varDF, sumVarDF, tolerance = 2 * (.Machine$double.eps)^0.25) 
 })

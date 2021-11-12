@@ -27,7 +27,7 @@ mix(
 
 \item{data}{a data frame containing the raw data for the model.}
 
-\item{weights}{a character vector of names of weight variables found in the data frame.}
+\item{weights}{a character vector of names of weight variables found in the data frame starts with units (level 1) and increasing (larger groups).}
 
 \item{cWeights}{logical, set to \code{TRUE} to use conditional weights. Otherwise, \code{mix} expects unconditional weights.}
 

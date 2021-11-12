@@ -1,7 +1,7 @@
 #' Survey Weighted Mixed-Effects Models 
 #' @param formula  a formula object in the style of \code{lme4} that creates the model.
 #' @param data  a data frame containing the raw data for the model.
-#' @param weights a character vector of names of weight variables found in the data frame.
+#' @param weights a character vector of names of weight variables found in the data frame starts with units (level 1) and increasing (larger groups).
 #' @param cWeights logical, set to \code{TRUE} to use conditional weights. Otherwise, \code{mix} expects unconditional weights.
 #' @param center_group a list where the name of each element is the name of the aggregation level, and the element is a formula of
 #'  variable names to be group mean centered; for example to group mean center gender and age within the group student:
@@ -562,7 +562,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       ihes <- -1*getHessian(b2(f=bsq, optpar=opt$par, b=bhatq$b, sigma0=bhatq$sigma, inds=inds),
                                            x=c(opt$par[inds], sigma=bhatq$sigma))
       eihes <- eigen(ihes)
-      if(max(eihes$values)/min(eihes$values) <= 400*sqrt(.Machine$double.eps)) {
+      if(max(eihes$values)/min(eihes$values) >= 1/((.Machine$double.eps)^0.25)) {
         warning("Numerical instability in estimating the standard error of variance terms. Consider the variance term standard errors approximate.")
         ihes <- nearPD(ihes,  posd.tol=400*sqrt(.Machine$double.eps))$mat
       }
