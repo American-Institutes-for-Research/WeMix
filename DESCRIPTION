@@ -1,6 +1,6 @@
 Package: WeMix
-Version: 3.1.9.9001
-Date: 2021-11-12
+Version: 3.1.9.9002
+Date: 2021-11-15
 Title: Weighted Mixed-Effects Models Using Multilevel Pseudo Maximum
         Likelihood Estimation
 Authors@R: c(person("Emmanuel", "Sikali", role="pdr", email = "Emmanuel.Sikali@ed.gov"),
@@ -13,7 +13,7 @@ Authors@R: c(person("Emmanuel", "Sikali", role="pdr", email = "Emmanuel.Sikali@e
 Maintainer: Paul Bailey <pbailey@air.org>
 Depends: lme4, R (>= 3.5.0)
 Imports: numDeriv, statmod, Rmpfr, NPflow, Matrix, methods, minqa
-Suggests: testthat, knitr, rmarkdown, withr, EdSurvey (>= 2.6.1)
+Suggests: testthat, knitr, rmarkdown, withr, tidyr, EdSurvey (>= 2.6.1)
 Description: Run mixed-effects models that include weights at every level. The WeMix package fits a weighted mixed model, also known as a multilevel, mixed, or hierarchical linear model (HLM). The weights could be inverse selection probabilities, such as those developed for an education survey where schools are sampled probabilistically, and then students inside of those schools are sampled probabilistically. Although mixed-effects models are already available in R, WeMix is unique in implementing methods for mixed models using weights at multiple levels. Both linear and logit models are supported. Models may have up to three levels. 
 License: GPL-2
 VignetteBuilder: knitr
@@ -27,7 +27,7 @@ URL: https://american-institutes-for-research.github.io/WeMix/
 BugReports: https://github.com/American-Institutes-for-Research/WeMix/issues
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2021-11-12 23:56:31 UTC; pbailey
+Packaged: 2021-11-15 23:22:18 UTC; pbailey
 Author: Emmanuel Sikali [pdr],
   Paul Bailey [aut, cre],
   Claire Kelley [aut],

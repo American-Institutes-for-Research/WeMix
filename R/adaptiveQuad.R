@@ -110,8 +110,13 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #currently wemix can only use complete cases
   #this removes any  incomplete cases if they exist 
   if(any(is.na(data[ , c(all.vars(formula), weights)]))) {
-    warning(paste0("There were ", sum(complete.cases(data)==FALSE), " rows with missing data. These have been removed."))
-    data <- data[complete.cases(data), ]
+    cl <- call("model.frame",
+               formula=formula(paste0("~", paste0(unique(c(all.vars(formula), weights)),collapse=" + "))),
+               data=data)
+    dt <- eval(cl, parent.frame(1L))
+    warning(paste0("There were ", sum(nrow(data) - nrow(dt)), " rows with missing data. These have been removed."))
+    data <- dt 
+    rm(dt)
   }
   if(length(weights) == 1) {
     # if the length of weights is 1 then below subsets on weights do not work.
