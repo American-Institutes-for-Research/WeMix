@@ -72,7 +72,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">WeMix</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">3.1.9.9002</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">3.2.0</span>
       </span>
     </div>
 
@@ -178,29 +178,29 @@ To identify which coefficients to test use the name exactly as it appears in
 the summary of the object.</p>
 
     <h2 class="hasAnchor" id="examples"><a class="anchor" href="#examples"></a>Examples</h2>
-    <pre class="examples"><div class='input'><span class='kw'>if</span> <span class='op'>(</span><span class='cn'>FALSE</span><span class='op'>)</span> <span class='op'>{</span>
-<span class='kw'><a href='https://rdrr.io/r/base/library.html'>library</a></span><span class='op'>(</span><span class='va'><a href='https://github.com/lme4/lme4/'>lme4</a></span><span class='op'>)</span> <span class='co'>#to use the example data </span>
-<span class='va'>sleepstudyU</span> <span class='op'>&lt;-</span> <span class='va'>sleepstudy</span>
-<span class='va'>sleepstudyU</span><span class='op'>$</span><span class='va'>weight1L1</span> <span class='op'>&lt;-</span> <span class='fl'>1</span>
-<span class='va'>sleepstudyU</span><span class='op'>$</span><span class='va'>weight1L2</span> <span class='op'>&lt;-</span> <span class='fl'>1</span>
-<span class='va'>wm0</span> <span class='op'>&lt;-</span> <span class='fu'><a href='mix.html'>mix</a></span><span class='op'>(</span><span class='va'>Reaction</span> <span class='op'>~</span> <span class='va'>Days</span> <span class='op'>+</span> <span class='op'>(</span><span class='fl'>1</span><span class='op'>|</span><span class='va'>Subject</span><span class='op'>)</span>, data<span class='op'>=</span><span class='va'>sleepstudyU</span>, 
-            weights<span class='op'>=</span><span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='st'>"weight1L1"</span>, <span class='st'>"weight1L2"</span><span class='op'>)</span><span class='op'>)</span>
-<span class='va'>wm1</span> <span class='op'>&lt;-</span> <span class='fu'><a href='mix.html'>mix</a></span><span class='op'>(</span><span class='va'>Reaction</span> <span class='op'>~</span> <span class='va'>Days</span> <span class='op'>+</span> <span class='op'>(</span><span class='fl'>1</span> <span class='op'>+</span><span class='va'>Days</span><span class='op'>|</span><span class='va'>Subject</span><span class='op'>)</span>, data<span class='op'>=</span><span class='va'>sleepstudyU</span>, 
-           weights<span class='op'>=</span><span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='st'>"weight1L1"</span>, <span class='st'>"weight1L2"</span><span class='op'>)</span><span class='op'>)</span>
-
-<span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm0</span>, type<span class='op'>=</span><span class='st'>"beta"</span><span class='op'>)</span>  <span class='co'>#test all betas </span>
-<span class='co'>#test only beta for days </span>
-<span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm0</span>, type<span class='op'>=</span><span class='st'>"beta"</span>, coefs<span class='op'>=</span><span class='st'>"Days"</span><span class='op'>)</span>  
-<span class='co'>#test only beta for intercept against hypothesis that it is 1</span>
-<span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm0</span>, type<span class='op'>=</span><span class='st'>"beta"</span>, coefs<span class='op'>=</span><span class='st'>"(Intercept)"</span>, hypothesis<span class='op'>=</span><span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='fl'>1</span><span class='op'>)</span><span class='op'>)</span>  
-
-<span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm1</span>,type<span class='op'>=</span><span class='st'>"Lambda"</span><span class='op'>)</span>  <span class='co'>#test all values of Lambda</span>
- <span class='co'>#test only some Lambdas.The names are the same as names(wm1$theta)</span>
-<span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm1</span>,type<span class='op'>=</span><span class='st'>"Lambda"</span>, coefs<span class='op'>=</span><span class='st'>"Subject.(Intercept)"</span><span class='op'>)</span> 
-<span class='co'>#specify  test values</span>
-<span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm1</span>,type<span class='op'>=</span><span class='st'>"Lambda"</span>, coefs<span class='op'>=</span><span class='st'>"Subject.(Intercept)"</span>, hypothesis<span class='op'>=</span><span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='fl'>1</span><span class='op'>)</span><span class='op'>)</span>  
-<span class='op'>}</span>
-</div></pre>
+    <pre class="examples"><span class='r-in'><span class='kw'>if</span> <span class='op'>(</span><span class='cn'>FALSE</span><span class='op'>)</span> <span class='op'>{</span></span>
+<span class='r-in'><span class='kw'><a href='https://rdrr.io/r/base/library.html'>library</a></span><span class='op'>(</span><span class='va'><a href='https://github.com/lme4/lme4/'>lme4</a></span><span class='op'>)</span> <span class='co'>#to use the example data </span></span>
+<span class='r-in'><span class='va'>sleepstudyU</span> <span class='op'>&lt;-</span> <span class='va'>sleepstudy</span></span>
+<span class='r-in'><span class='va'>sleepstudyU</span><span class='op'>$</span><span class='va'>weight1L1</span> <span class='op'>&lt;-</span> <span class='fl'>1</span></span>
+<span class='r-in'><span class='va'>sleepstudyU</span><span class='op'>$</span><span class='va'>weight1L2</span> <span class='op'>&lt;-</span> <span class='fl'>1</span></span>
+<span class='r-in'><span class='va'>wm0</span> <span class='op'>&lt;-</span> <span class='fu'><a href='mix.html'>mix</a></span><span class='op'>(</span><span class='va'>Reaction</span> <span class='op'>~</span> <span class='va'>Days</span> <span class='op'>+</span> <span class='op'>(</span><span class='fl'>1</span><span class='op'>|</span><span class='va'>Subject</span><span class='op'>)</span>, data<span class='op'>=</span><span class='va'>sleepstudyU</span>, </span>
+<span class='r-in'>            weights<span class='op'>=</span><span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='st'>"weight1L1"</span>, <span class='st'>"weight1L2"</span><span class='op'>)</span><span class='op'>)</span></span>
+<span class='r-in'><span class='va'>wm1</span> <span class='op'>&lt;-</span> <span class='fu'><a href='mix.html'>mix</a></span><span class='op'>(</span><span class='va'>Reaction</span> <span class='op'>~</span> <span class='va'>Days</span> <span class='op'>+</span> <span class='op'>(</span><span class='fl'>1</span> <span class='op'>+</span><span class='va'>Days</span><span class='op'>|</span><span class='va'>Subject</span><span class='op'>)</span>, data<span class='op'>=</span><span class='va'>sleepstudyU</span>, </span>
+<span class='r-in'>           weights<span class='op'>=</span><span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='st'>"weight1L1"</span>, <span class='st'>"weight1L2"</span><span class='op'>)</span><span class='op'>)</span></span>
+<span class='r-in'></span>
+<span class='r-in'><span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm0</span>, type<span class='op'>=</span><span class='st'>"beta"</span><span class='op'>)</span>  <span class='co'>#test all betas </span></span>
+<span class='r-in'><span class='co'>#test only beta for days </span></span>
+<span class='r-in'><span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm0</span>, type<span class='op'>=</span><span class='st'>"beta"</span>, coefs<span class='op'>=</span><span class='st'>"Days"</span><span class='op'>)</span>  </span>
+<span class='r-in'><span class='co'>#test only beta for intercept against hypothesis that it is 1</span></span>
+<span class='r-in'><span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm0</span>, type<span class='op'>=</span><span class='st'>"beta"</span>, coefs<span class='op'>=</span><span class='st'>"(Intercept)"</span>, hypothesis<span class='op'>=</span><span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='fl'>1</span><span class='op'>)</span><span class='op'>)</span>  </span>
+<span class='r-in'></span>
+<span class='r-in'><span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm1</span>,type<span class='op'>=</span><span class='st'>"Lambda"</span><span class='op'>)</span>  <span class='co'>#test all values of Lambda</span></span>
+<span class='r-in'> <span class='co'>#test only some Lambdas.The names are the same as names(wm1$theta)</span></span>
+<span class='r-in'><span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm1</span>,type<span class='op'>=</span><span class='st'>"Lambda"</span>, coefs<span class='op'>=</span><span class='st'>"Subject.(Intercept)"</span><span class='op'>)</span> </span>
+<span class='r-in'><span class='co'>#specify  test values</span></span>
+<span class='r-in'><span class='fu'>waldTest</span><span class='op'>(</span><span class='va'>wm1</span>,type<span class='op'>=</span><span class='st'>"Lambda"</span>, coefs<span class='op'>=</span><span class='st'>"Subject.(Intercept)"</span>, hypothesis<span class='op'>=</span><span class='fu'><a href='https://rdrr.io/r/base/c.html'>c</a></span><span class='op'>(</span><span class='fl'>1</span><span class='op'>)</span><span class='op'>)</span>  </span>
+<span class='r-in'><span class='op'>}</span></span>
+</pre>
   </div>
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
     <nav id="toc" data-toggle="toc" class="sticky-top">

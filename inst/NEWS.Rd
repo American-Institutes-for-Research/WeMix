@@ -4,13 +4,13 @@
 \section{Changes in version 3.2.0}{
   \subsection{BUG FIXES}{
     \itemize{
-      \item \code{mix} was not returning on some data that was unsorted. The function was made more robust to unsorted data.
+      \item \code{mix} was not returning on some data that was unsorted, and the function was made more robust to unsorted data.
       \item \code{mix} used to drop rows if they had an \code{NA} on any column, regardless of if it was used in the model. Now it first forms a model frame with the relevant rows before doing this. Thank you to Bernhard Clemm von Hohenberg for pointing out this bug. From https://github.com/American-Institutes-for-Research/WeMix/issues/2.
     }
   }
   \subsection{DOCUMENTATION}{
     \itemize{
-      \item the documentation for the \code{weights} variable has been improved to indicate what order to put the weights in. Thank you to Bernhard Clemm von Hohenberg for pointing out the possible confusion.
+      \item The documentation for the \code{weights} variable has been improved to indicate what order to put the weights in. Thank you to Bernhard Clemm von Hohenberg for pointing out the possible confusion.
     }
   }
 }
