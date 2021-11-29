@@ -354,6 +354,40 @@ test_that("Unweighted three level model", {
   expect_equal(unname(wm0$vars[length(wm0$vars)]), unname(lm0@devcomp$cmp["sigmaML"]^2), tol=1e-4)
 })
 
+context("Weighted v unweighted replicated three level model")
+test_that("Weighted v unweighted replicated three level model", {
+  sleepstudy2 <- sleepstudy
+  sleepstudy2$Group <- 1
+  sleepstudy2$Group <- ifelse(sleepstudy2$Subject %in% c("310", "309", "349", "335"), 2, sleepstudy2$Group)
+  sleepstudy2$Group <- ifelse(sleepstudy2$Subject %in% c("330", "352", "337", "369"), 3, sleepstudy2$Group)
+  sleepstudy2$Group <- ifelse(sleepstudy2$Subject %in% c("331", "332", "334", "372"), 4, sleepstudy2$Group)
+  #sleepstudy2$Group <- factor(sleepstudy2$Group)
+  sleepstudy2$w1 <- 1 
+  sleepstudy2$w2 <- 1
+  sleepstudy2$w3 <- 1
+  sleepstudy2$Subject <- as.character(sleepstudy2$Subject)
+  g1 <- subset(sleepstudy2, Group == 1)
+  g1$Group <- 5
+  g1$Subject <- paste0("5",g1$Subject)
+  sleepstudyrep <- rbind(sleepstudy2, g1)
+  sleepstudy2$Group <- factor(sleepstudy2$Group)
+  sleepstudy2$Subject <- factor(sleepstudy2$Subject)
+
+  sleepstudy2$w3 <- ifelse(sleepstudy2$Group == 1, 2, 1)
+
+  wm0 <- mix(Reaction ~ Days + (1|Subject) + (1 | Group), data=sleepstudyrep, weights=c("w1", "w2","w3"), verbose=FALSE, run=TRUE)
+  wmw <- mix(Reaction ~ Days + (1|Subject) + (1 | Group), data=sleepstudy2, weights=c("w1", "w2","w3"), verbose=FALSE, run=TRUE, cWeights=TRUE)
+  lm0 <- lmer(Reaction ~ Days + (1|Subject) + (1 | Group), data=sleepstudyrep,REML=FALSE)
+  # check vars
+  lmevars1 <- data.frame(summary(lm0)$varcor)$sdcor
+  expect_equal(unname(wm0$vars),
+               expected = unname(lmevars1)^2,
+               tolerance = 1e-3)
+  expect_equal(wm0$lnl, as.numeric(logLik(lm0)), tol=1e-3)
+  expect_equal(coef(wm0), fixef(lm0), tol=1e-4)
+  expect_equal(unname(wm0$vars[length(wm0$vars)]), unname(lm0@devcomp$cmp["sigmaML"]^2), tol=1e-4)
+})
+
 context("Three level model slash and colon")
 test_that("Three level model slash and colon", {
   sleepstudy2 <- sleepstudy

@@ -1,6 +1,6 @@
 Package: WeMix
-Version: 3.2.0
-Date: 2021-11-16
+Version: 3.2.0.9000
+Date: 2021-11-29
 Title: Weighted Mixed-Effects Models Using Multilevel Pseudo Maximum
         Likelihood Estimation
 Authors@R: c(person("Emmanuel", "Sikali", role="pdr", email = "Emmanuel.Sikali@ed.gov"),

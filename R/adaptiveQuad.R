@@ -504,12 +504,11 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     # if level >2 then set up conditional weigths
     weights_list_cond <- weights_list
     if(levels > 2 ){
-      cWeights <- cbind(group_id, data[ , weights0])
+      cWeights <- cbind(group_id, wgts0)
       for (level in 1:(levels-1)){
         cWeights[ , weights0[level]] <- cWeights[ , weights0[level]] / cWeights[ , weights0[level + 1]]
       }
       weights_list_cond[[1]] <- cWeights[ , weights0[1]] #first level weights dont get grouped 
-        
       for (level in 2:levels){
         # grab the first element, sorted as the data came
         weights_list_cond[[level]] <- cWeights[!duplicated(cWeights[,all_groups[level-1]]), weights0[level]]
