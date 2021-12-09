@@ -53,7 +53,7 @@ test_that("The model runs", {
   sleepstudy2$Reaction <- sleepstudy2$Reaction + sleepstudy2$block*20
   names(sleepstudy2) <- gsub("weight1L","pwt",names(sleepstudy2))
   lmr <- lmer(Reaction ~ Days + (1|Subject) + (1|block), data=sleepstudy2, REML=FALSE)
-  mm <- mix(Reaction ~ Days + (1|Subject) + (1|block), data=sleepstudy2, weights=c("pwt1","pwt2","pwt3"))
+  mm <- mix(Reaction ~ Days + (1|Subject) + (1|block), data=sleepstudy2, weights=c("pwt1", "pwt2", "pwt3"))
   expect_equal(unname(mm$lnl),
                expected=unname(logLik(lmr)[[1]]),
                tolerance=tolerance)
@@ -354,6 +354,80 @@ test_that("Unweighted three level model", {
   expect_equal(unname(wm0$vars[length(wm0$vars)]), unname(lm0@devcomp$cmp["sigmaML"]^2), tol=1e-4)
 })
 
+
+context("Weighted v unweighted replicated two level model")
+test_that("Weighted v unweighted replicated two level model", {
+  sleepstudy2 <- sleepstudy
+  sleepstudy2$w1 <- 1 
+  sleepstudy2$w2 <- 1
+  sleepstudy2$w3 <- 1
+  sleepstudy2$Subject <- as.character(sleepstudy2$Subject)
+  g1 <- subset(sleepstudy2, sleepstudy2$Subject %in% c("310", "309", "349", "335"))
+  g1$Subject <- paste0("R", g1$Subject)
+  sleepstudyrep <- rbind(sleepstudy2, g1)
+  sleepstudy2$Subject <- factor(sleepstudy2$Subject)
+
+  sleepstudy2$w2 <- ifelse(sleepstudy2$Subject %in% c("310", "309", "349", "335"), 2, 1)
+  
+  # two level
+  wm0 <- mix(Reaction ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), verbose=FALSE, run=TRUE)
+  wmw <- mix(Reaction ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), verbose=FALSE, run=TRUE, cWeights=TRUE)
+  lm0 <- lmer(Reaction ~ Days + (1|Subject), data=sleepstudyrep, REML=FALSE)
+  # check vars
+  lmevars1 <- data.frame(summary(lm0)$varcor)$sdcor
+  expect_equal(unname(wm0$vars),
+               expected = unname(lmevars1)^2,
+               tolerance = 1e-3)
+  expect_equal(wm0$lnl, as.numeric(logLik(lm0)), tol=1e-3)
+  expect_equal(coef(wm0), fixef(lm0), tol=1e-4)
+  expect_equal(unname(wm0$vars[length(wm0$vars)]), unname(lm0@devcomp$cmp["sigmaML"]^2), tol=1e-4)
+
+  expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
+  expect_equal(coef(wmw), coef(wm0), tol=1e-4)
+  expect_equal(wmw$vars, wm0$vars, tol=1e-4)
+
+  # should be the same if not conditional as well
+  sleepstudy2$w1 <- sleepstudy2$w2
+  wmw <- mix(Reaction ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), verbose=FALSE, run=TRUE, cWeights=FALSE)
+  expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
+  expect_equal(coef(wmw), coef(wm0), tol=1e-4)
+  expect_equal(wmw$vars, wm0$vars, tol=1e-4)
+  
+  # sub 1 conditional weights work
+  sleepstudy2 <- sleepstudy
+  sleepstudy2$w1 <- 1 
+  sleepstudy2$w2 <- 1
+  sleepstudy2$w3 <- 1
+  sleepstudy2$Subject <- as.character(sleepstudy2$Subject)
+  g1 <- subset(sleepstudy2, sleepstudy2$Subject %in% c("310", "309", "349", "335"))
+  # do not renaem subject
+  sleepstudyrep <- rbind(sleepstudy2, g1)
+  sleepstudyrep$w1 <- ifelse(sleepstudyrep$Subject %in% c("310", "309", "349", "335"), 0.5, 1)
+  
+  # two level
+  wm0 <- mix(Reaction ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), verbose=FALSE, run=TRUE, cWeights=TRUE)
+  wmw <- mix(Reaction ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), verbose=FALSE, run=TRUE)
+  lm0 <- lmer(Reaction ~ Days + (1|Subject), data=sleepstudy2, REML=FALSE)
+  # check vars
+  lmevars1 <- data.frame(summary(lm0)$varcor)$sdcor
+  expect_equal(unname(wm0$vars),
+               expected = unname(lmevars1)^2,
+               tolerance = 1e-3)
+  expect_equal(wm0$lnl, as.numeric(logLik(lm0)), tol=1e-3)
+  expect_equal(coef(wm0), fixef(lm0), tol=1e-4)
+  expect_equal(unname(wm0$vars[length(wm0$vars)]), unname(lm0@devcomp$cmp["sigmaML"]^2), tol=1e-4)
+
+  expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
+  expect_equal(coef(wmw), coef(wm0), tol=1e-4)
+  expect_equal(wmw$vars, wm0$vars, tol=1e-4)
+
+  # should be the same if not conditional as well
+  wm0 <- mix(Reaction ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), verbose=FALSE, run=TRUE)
+  expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
+  expect_equal(coef(wmw), coef(wm0), tol=1e-4)
+  expect_equal(wmw$vars, wm0$vars, tol=1e-4)
+})
+
 context("Weighted v unweighted replicated three level model")
 test_that("Weighted v unweighted replicated three level model", {
   sleepstudy2 <- sleepstudy
@@ -368,15 +442,35 @@ test_that("Weighted v unweighted replicated three level model", {
   sleepstudy2$Subject <- as.character(sleepstudy2$Subject)
   g1 <- subset(sleepstudy2, Group == 1)
   g1$Group <- 5
-  g1$Subject <- paste0("5",g1$Subject)
+  g1$Subject <- paste0("5", g1$Subject)
   sleepstudyrep <- rbind(sleepstudy2, g1)
+  s308 <- subset(sleepstudy2, Subject %in% "308")
+  s308$Subject <- "R308"
+  sleepstudyrep <- rbind(sleepstudyrep, s308)
+  s308$Group <- 5
+  s308$Subject <- "5R308"
+  sleepstudyrep <- rbind(sleepstudyrep, s308)
+
   sleepstudy2$Group <- factor(sleepstudy2$Group)
   sleepstudy2$Subject <- factor(sleepstudy2$Subject)
 
+  sleepstudy2$w2 <- ifelse(sleepstudy2$Subject == "308", 2, 1)
   sleepstudy2$w3 <- ifelse(sleepstudy2$Group == 1, 2, 1)
+  sleepstudy2$w2u <- ifelse(sleepstudy2$Group == 1, 2, 1)
+  sleepstudy2$w2u <- ifelse(sleepstudy2$Subject == "308", 4, sleepstudy2$w2u)
+  sleepstudy2$w1u <- ifelse(sleepstudy2$Group == 1, 2, 1)
+  sleepstudy2$w1u <- ifelse(sleepstudy2$Subject == "308", 4, sleepstudy2$w1u)
 
+  # replication
   wm0 <- mix(Reaction ~ Days + (1|Subject) + (1 | Group), data=sleepstudyrep, weights=c("w1", "w2","w3"), verbose=FALSE, run=TRUE)
+  # conditional weights
   wmw <- mix(Reaction ~ Days + (1|Subject) + (1 | Group), data=sleepstudy2, weights=c("w1", "w2","w3"), verbose=FALSE, run=TRUE, cWeights=TRUE)
+  expect_equal(wm0$lnl, wmw$lnl, tol=20*sqrt(.Machine$double.eps))
+  expect_equal(coef(wmw), coef(wm0), tol=20*sqrt(.Machine$double.eps))
+  # unconditional weights
+  wmwc <- mix(Reaction ~ Days + (1|Subject) + (1 | Group), data=sleepstudy2, weights=c("w1u", "w2u","w3"), verbose=FALSE, run=TRUE, cWeights=FALSE)
+  expect_equal(wm0$lnl, wmwc$lnl, tol=20*sqrt(.Machine$double.eps))
+  expect_equal(coef(wmwc), coef(wm0), tol=20*sqrt(.Machine$double.eps))
   lm0 <- lmer(Reaction ~ Days + (1|Subject) + (1 | Group), data=sleepstudyrep,REML=FALSE)
   # check vars
   lmevars1 <- data.frame(summary(lm0)$varcor)$sdcor
@@ -386,7 +480,13 @@ test_that("Weighted v unweighted replicated three level model", {
   expect_equal(wm0$lnl, as.numeric(logLik(lm0)), tol=1e-3)
   expect_equal(coef(wm0), fixef(lm0), tol=1e-4)
   expect_equal(unname(wm0$vars[length(wm0$vars)]), unname(lm0@devcomp$cmp["sigmaML"]^2), tol=1e-4)
+
+  expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
+  expect_equal(coef(wmw), coef(wm0), tol=1e-4)
+  expect_equal(wmw$vars, wm0$vars, tol=1e-4)
+
 })
+
 
 context("Three level model slash and colon")
 test_that("Three level model slash and colon", {
@@ -886,7 +986,7 @@ context("Model with top level groups that have entirely 0 columns in Z")
 test_that("Model with top level groups that have entirely 0 columns in Z", {
   skip_on_cran()
   require(EdSurvey)
-  downloadECLS_K(root=edsurveyHome, years=2011)
+  downloadECLS_K(root=edsurveyHome, years=2011, verbose=FALSE)
   ee <- readECLS_K2011(paste0(edsurveyHome, "ECLS_K/2011/"), verbose=FALSE)
   gg <- EdSurvey::getData(c("x2rscalk5", "childid", "s2_id", "w1_2p0", "x3sumsh", "p1chldbk","p2freerd"), data=ee, omittedLevels=FALSE, returnJKreplicates=FALSE)
   gg$frpl <- ifelse(gg$p2freerd %in% c("1: FREE LUNCH", "2: REDUCED PRICE LUNCH"), 1, 0)
@@ -894,10 +994,6 @@ test_that("Model with top level groups that have entirely 0 columns in Z", {
   gg$w2 <- 1
   gg$n <- ave(gg$s2_id,gg$s2_id, FUN=length)
   gg2 <- gg[!is.na(gg$x2rscalk5) & gg$w1>0 & !is.na(gg$p1chldbk) & gg$n > 15 & gg$s2_id < 1500,]
-  if(FALSE) {
-    gg2 <- gg[!is.na(gg$x2rscalk5) & gg$w1>0 & !is.na(gg$p1chldbk) & gg$n > 15,]
-    pv <- profvis(m3 <- mix(x2rscalk5 ~ p1chldbk + frpl + (1+frpl|s2_id), data=gg2, weights=c("w1", "w2"), verbose=FALSE))
-  }
   m3 <- mix(x2rscalk5 ~ p1chldbk + frpl + (1+frpl|s2_id), data=gg2, weights=c("w1", "w2"), verbose=FALSE)
   # regression tests
   expect_equal(m3$lnl, -4076916.913043, tol=1e-5)
@@ -923,7 +1019,7 @@ context("TIMSS tests")
 test_that("TIMSS tests", {
   skip_on_cran()
   # original version by Christian Kjeldsen
-  downloadTIMSS(root=edsurveyHome, years=2015, cache=FALSE, verbose=FALSE)
+  try(downloadTIMSS(root=edsurveyHome, years=2015, cache=FALSE, verbose=FALSE), silent=TRUE)
   dnk15 <- readTIMSS(file.path(edsurveyHome,"/TIMSS/2015"), countries="dnk", gradeLvl=4, verbose=FALSE)
   dnk15dat <- EdSurvey::getData(data=dnk15, varnames=c("atbg01", "asbgsb", "mmat", "asbghrl", "matwgt", "idschool","schwgt"))
   dnk15dat <- subset(dnk15dat, matwgt > 0 & schwgt > 0)

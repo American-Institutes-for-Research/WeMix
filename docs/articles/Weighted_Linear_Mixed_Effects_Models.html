@@ -19,6 +19,8 @@
 <![endif]-->
 </head>
 <body data-spy="scroll" data-target="#toc">
+    
+
     <div class="container template-article">
       <header><div class="navbar navbar-default navbar-fixed-top" role="navigation">
   <div class="container">
@@ -31,18 +33,12 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">WeMix</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="Released version">3.2.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">3.2.1</span>
       </span>
     </div>
 
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
-<li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
-</li>
 <li>
   <a href="../reference/index.html">Reference</a>
 </li>
@@ -64,7 +60,7 @@
       </ul>
 <ul class="nav navbar-nav navbar-right">
 <li>
-  <a href="https://github.com/American-Institutes-for-Research/WeMix/">
+  <a href="https://github.com/American-Institutes-for-Research/WeMix/" class="external-link">
     <span class="fab fa-github fa-lg"></span>
      
   </a>
@@ -79,24 +75,24 @@
 
       
 
-      </header><script src="Weighted_Linear_Mixed_Effects_Models_files/header-attrs-2.11/header-attrs.js"></script><script src="Weighted_Linear_Mixed_Effects_Models_files/accessible-code-block-0.0.1/empty-anchor.js"></script><div class="row">
+      </header><script src="Weighted_Linear_Mixed_Effects_Models_files/accessible-code-block-0.0.1/empty-anchor.js"></script><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Weighted Linear Mixed-Effects Models</h1>
-                        <h4 class="author">Developed by Paul Bailey </h4>
+                        <h4 data-toc-skip class="author">Developed by Paul Bailey </h4>
             
-            <h4 class="date">February 14, 2018</h4>
+            <h4 data-toc-skip class="date">February 14, 2018</h4>
       
-      <small class="dont-index">Source: <a href="https://github.com/American-Institutes-for-Research/WeMix/blob/master/vignettes/Weighted_Linear_Mixed_Effects_Models.Rmd"><code>vignettes/Weighted_Linear_Mixed_Effects_Models.Rmd</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/American-Institutes-for-Research/WeMix/blob/HEAD/vignettes/Weighted_Linear_Mixed_Effects_Models.Rmd" class="external-link"><code>vignettes/Weighted_Linear_Mixed_Effects_Models.Rmd</code></a></small>
       <div class="hidden name"><code>Weighted_Linear_Mixed_Effects_Models.Rmd</code></div>
 
     </div>
 
     
     
-<div id="introduction" class="section level1">
-<h1 class="hasAnchor">
-<a href="#introduction" class="anchor"></a>Introduction</h1>
+<div class="section level1">
+<h1 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
+</h1>
 <p>The <code>WeMix</code> package aims to fit a linear mixed model where units are nested inside groups,which may themselves be nested in groups,a model specified by Rabe-Hesketh and Skrondal (2006) and Rabe-Hesketh, Skrondal, and Pickles (2002) for the GLLAMM software. The advantage of fitting the model in nested levels is that survey sampling weights can be incorporated; the pseudo-likelihood, at the top level, is an integral that sums across the top-level groups, weighting each group or unit (in a two-level model) according to sampling weights.</p>
 <p>At the highest level, the likelihood (<span class="math inline">\(\mathcal{L}\)</span>) is a function of the parameters for the random-effect covariance matrix (<span class="math inline">\(\bm{\theta}\)</span>), the fixed-effect estimates (<span class="math inline">\(\bm{\beta}\)</span>), and the outcomes <span class="math inline">\(\bm{y}\)</span>. This equation relates the overall likelihood [<span class="math inline">\(\mathcal{L}(\bm{\theta}, \bm{\beta}; \bm{y})\)</span>] to the integral of the likelihoods of the integrals of the top-level units [<span class="math inline">\(\mathcal{L}^{(L)}_{j}(\bm{\theta}, \bm{\beta} ; \bm{y}| \bm{u}^{(L)})\)</span>, indexed by <span class="math inline">\(j\)</span>]; the top-level unit likelihoods have a superscript <span class="math inline">\((L)\)</span> to indicate they are for the <span class="math inline">\(L\)</span>th (top) level. Here we omit reference to the fixed-effect design matrix <span class="math inline">\(\bm{X}\)</span> and the random-effect design matrix <span class="math inline">\(\bm{Z}\)</span>, but the likelihood is conditional on those terms as well. <span class="math display">\[\begin{align}
 \mathcal{L}(\bm{\theta}, \bm{\beta}; \bm{y}) &amp;= \int g^{(L)}(\bm{u}^{(L)};\bm{\theta}^{(L)})\prod_{j}{ \bigg[\mathcal{L}^{(L)}_{j}(\bm{\theta}, \bm{\beta} ; \bm{y}| \bm{u}^{(L)})\bigg]^{w^{(L)}_{j}}} d\bm{u}^{(L)}
@@ -322,9 +318,9 @@ D \left( \bm{\theta}; \bm{y} \right)&amp;= 2\, \rm{ln} \left(\alpha (\bm{\theta}
 \end{align}\]</span> This function is then minimized numerically with respect to <span class="math inline">\(\bm{\theta}\)</span>, using the profile estimates for <span class="math inline">\(\bm{\beta}\)</span> and <span class="math inline">\(\bm{\upsilon}\)</span> (eq. ) and <span class="math inline">\(\widehat{\sigma^2}\)</span> (eq. ).</p>
 <p>The estimated values are then the <span class="math inline">\(\bm{\theta}\)</span> that maximize eq. , the <span class="math inline">\(\sigma^2\)</span> value from eq. , and the <span class="math inline">\(\bm{\beta}\)</span> values from solving the system of equations in eq. .</p>
 </div>
-<div id="variance-estimation" class="section level1">
-<h1 class="hasAnchor">
-<a href="#variance-estimation" class="anchor"></a>Variance Estimation</h1>
+<div class="section level1">
+<h1 id="variance-estimation">Variance Estimation<a class="anchor" aria-label="anchor" href="#variance-estimation"></a>
+</h1>
 <p>The inverse Hessian of <span class="math inline">\(\bm{\beta}\)</span> is given by (Bates et al., 2015, eq. 54): <span class="math display">\[\begin{align}
 \widehat{\rm{Var}}(\bm{\beta}) &amp;= \widehat{\sigma^2} \bm{R}_{22}^{-1} \left(\bm{R}^T_{22}\right)^{-1}
 \end{align}\]</span> with <span class="math inline">\(\bm{R}_{22}\)</span> coming from eq. . This variance estimator assumes that the weights are information weights and so is inappropriate for survey weights.</p>
@@ -347,9 +343,9 @@ D \left( \bm{\theta}; \bm{y} \right)&amp;= 2\, \rm{ln} \left(\alpha (\bm{\theta}
 <p>However, the variance estimates are not simply the values of <span class="math inline">\(\bm{\theta}\)</span> and <span class="math inline">\(\sigma\)</span> but transformations of that (eq. ). To estimate the variances of the variance estimates, the Delta method is used so that <span class="math display">\[\begin{align}
 {\rm Var}\left(\bm{\Sigma}, \sigma^2 \right) = \left[ \nabla ( \bm{\Lambda}^T \bm{\Lambda} ) \right]^T {\rm Var}\left(\bm{\theta}, \sigma^2 \right) \left[ \nabla  ( \bm{\Lambda}^T \bm{\Lambda}) \right]
 \end{align}\]</span> where the gradient (<span class="math inline">\(\nabla (\cdot)\)</span>) is taken with respect to the elements of <span class="math inline">\(\bm{\Sigma}\)</span> and <span class="math inline">\(\sigma^2\)</span>, and <span class="math inline">\(\rm{Var}\left(\bm{\theta}, \sigma^2 \right)\)</span> is from eq. .</p>
-<div id="model-evaluation-wald-test" class="section level2">
-<h2 class="hasAnchor">
-<a href="#model-evaluation-wald-test" class="anchor"></a>Model Evaluation: Wald Test</h2>
+<div class="section level2">
+<h2 id="model-evaluation-wald-test">Model Evaluation: Wald Test<a class="anchor" aria-label="anchor" href="#model-evaluation-wald-test"></a>
+</h2>
 <p>We can use the a Wald test to test both fixed effects parameters (<span class="math inline">\(\beta\)</span>) and variance of the random parameters (<span class="math inline">\(\Lambda\)</span>).</p>
 <p>The Wald test compares estimated parameters with null hypothesis values. In the default case the null hypothesis is that value of the parameters is 0.</p>
 <p>In this default case, if the test fails to reject the null hypothesis, removing the variables from the model will not substantially harm the fit of that model.</p>
@@ -363,9 +359,9 @@ W =(R\hat{\beta} - r)'(R\hat{V}R')^{-1}(R\hat{\beta} - r)
 <p><span class="math display">\[ W \sim \chi^2(p) \]</span></p>
 </div>
 </div>
-<div id="references" class="section level1">
-<h1 class="hasAnchor">
-<a href="#references" class="anchor"></a>References</h1>
+<div class="section level1">
+<h1 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
+</h1>
 <p>Bates, D., Machler, M., Bolker, B. M., &amp; Walker, S. C. (2015), Fitting linear mixed-effects models using lme4. <em>Journal of Statistical Software</em>, <em>67</em>(<em>1</em>), 1–48.</p>
 <p>Bates, D., &amp; Pinheiro, J. C. (1998). <em>Computational methods for multilevel modelling.</em> Bell Labs Report.</p>
 <p>Binder, D. A. (1983). On the variances of asymptotically normal estimators from complex surveys. <em>International Statistical Review</em>, <em>51</em>(<em>3</em>), 279–292.</p>
@@ -389,11 +385,13 @@ W =(R\hat{\beta} - r)'(R\hat{V}R')^{-1}(R\hat{\beta} - r)
 
 
       <footer><div class="copyright">
-  <p>Developed by Paul Bailey, Claire Kelley, Trang Nguyen, Huade Huo.</p>
+  <p></p>
+<p>Developed by Paul Bailey, Claire Kelley, Trang Nguyen, Huade Huo.</p>
 </div>
 
 <div class="pkgdown">
-  <p>Site built with <a href="https://pkgdown.r-lib.org/">pkgdown</a> 1.6.1.</p>
+  <p></p>
+<p>Site built with <a href="https://pkgdown.r-lib.org/" class="external-link">pkgdown</a> 2.0.0.</p>
 </div>
 
       </footer>
@@ -401,6 +399,8 @@ W =(R\hat{\beta} - r)'(R\hat{V}R')^{-1}(R\hat{\beta} - r)
 
   
 
+
+  
 
   </body>
 </html>

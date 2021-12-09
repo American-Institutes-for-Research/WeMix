@@ -527,7 +527,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     if(verbose) {
       message("Fitting weighted model.")
     }
-
     opt <- bobyqa(fn=bsqG, par=theta)
     
     names(opt$par) <- names(theta)

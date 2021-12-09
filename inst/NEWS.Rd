@@ -1,6 +1,19 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
+\section{Changes in version 3.2.1}{
+  \subsection{IMPROVEMENTS}{
+    \itemize{
+      \item When estimating the standard errors, the evaluation of the Jacobian was further optimized. Internal tests show a speedup between zero and thirty percent per model fit.
+    }
+  }
+  \subsection{BUG FIXES}{
+    \itemize{
+      \item In a three-level linear model, when \code{cWeights=TRUE}, the weights were incorrectly adjusted. This has been fixed.
+    }
+  }
+}
+
 \section{Changes in version 3.2.0}{
   \subsection{BUG FIXES}{
     \itemize{

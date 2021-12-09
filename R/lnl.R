@@ -256,7 +256,7 @@ calc.lin.lnl.quad <- function(y, yhat, level, Z, Qi, omega, W, C, qp,
       agg <- merge(agg, aggPrior, by="indexp1")
       # exponetiate to reverse the log manipulations done earlier 
       # using log manipulation is important for maintaining precision when likelihood is very small 
-      agg$li <- exp(mpfr(log(grd$w[i]) + agg$lli + agg$g_weight + sum(v*v),acc))
+      agg$li <- exp(mpfr(log(grd$w[i]) + agg$lli + agg$g_weight + sum(v*v), acc))
       if(!is.null(integralMultiplierExponent)) {
         agg$li <- agg$li * agg$x^integralMultiplierExponent
       }
