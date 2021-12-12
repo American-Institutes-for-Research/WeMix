@@ -528,7 +528,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       message("Fitting weighted model.")
     }
     opt <- bobyqa(fn=bsqG, par=theta)
-    
     names(opt$par) <- names(theta)
     
     #opt$par are the theta estimates

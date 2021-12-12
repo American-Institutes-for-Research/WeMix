@@ -1,6 +1,15 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
+\section{Changes in version 3.2.1.9000}{
+  \subsection{IMPROVEMENTS}{
+    \itemize{
+      \item WeMix now fits linear models with any number of levels and has been tested with 4-level models.
+    }
+  }
+}
+
+
 \section{Changes in version 3.2.1}{
   \subsection{IMPROVEMENTS}{
     \itemize{

@@ -46,7 +46,9 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
     stop(paste0("Number of rows in ", dQuote("groupID"), " must agree with number of rows in ", dQuote("X"), "."))
   }
   # groupID needs to be one indexed on the top level, so enforce that (this is used for robustSE)
-  groupID[ , ncol(groupID)] <- as.numeric(as.factor(groupID[ , ncol(groupID)]))
+  for(gLevel in 1:ncol(groupID)) {
+    groupID[ , gLevel] <- as.numeric(as.factor(groupID[ , gLevel]))
+  }
   # get the number of groups per level
   nc <- apply(groupID, 2, function(x) { length(unique(x)) } )
   
@@ -218,6 +220,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
     levels <- max(lmeVarDF$level)
     
     LambdaL <- list()
+
     for (l in 2:levels){
       #set up matrix of zeros with rows and columns for each random effect
       #number of random effect is the number of variance terms at that level (not including covariance terms )
@@ -283,6 +286,8 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
     # used to find columns with no-non-zero elements
     # grab and the random effect vector
     u <- ub[1:ncol(Z)]
+    IMatCols <- ncol(ZiAl[[1]])
+    groupsTop <- unique(groupID[ , ncol(groupID)])
     if(lndetLz0u) {
       # only evaluate all of this if we do not already have an lnldetZ value
       for(level in 1:ncol(groupID)) { # really level -1
@@ -293,19 +298,23 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
         topLevel <- level == ncol(groupID)
         qi <- nrow(Deltai)
         if(level > 1) {
-          LambdaLev <- bdiag(LambdaL[-(1:(level-1))])
-          IMat <- matrix(0, nrow=qi, ncol=ncol(pR11[[groups[1]]]))
+          # lambdaLev already used at level 1
+          # but still postpend new IMat
+          IMat <- matrix(0, nrow=qi, ncol=IMatCols)
+          IMatCols <- IMatCols - qi
         } else {
           LambdaLev <- bdiag(LambdaL)
-          IMat <- matrix(0, nrow=qi, ncol=ncol(ZiAl[[1]]))
+          IMat <- matrix(0, nrow=qi, ncol=IMatCols)
+          IMatCols <- IMatCols - qi
         } 
         diag(IMat) <- 1
         for(gi in 1:length(groups)) {
           if(level == 1) {
             # get Zi
             ZiA <- ZiAl[[gi]]
+            Zrows <- groupID[ , level] == groups[gi]
+            ltop <- unique(groupID[Zrows, ncol(groupID)])
             if(!topLevel) {
-              Zrows <- groupID[ , level] == groups[gi]
               # unit ID for level above this
               lp1 <- unique(groupID[Zrows, level+1])
               qp1 <- nrow(Delta[[level+2]])
@@ -324,51 +333,62 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
             lndetLzi <- weights[[level+1]][gi] * sum(log(abs(Matrix::diag(R22))))
             # save R11 for next level up, if there is a next level up
             if (!topLevel) {
-              R11i <- sqrt(weightsC[[level+1]][gi])*ZiAR[-(1:qi),qi+1:qp1, drop=FALSE]
+              R11i <- sqrt(weightsC[[level+1]][gi])*ZiAR[-(1:qi), -(1:qi), drop=FALSE]
               # load in R11 (a list defined above) to the correct level
               # this if/else allows lp1 to be out of order
               if(length(R11) < lp1 || is.null(R11[[lp1]])) {
                 # there was no R11, so start it off with this R11
                 R11[[lp1]] <- R11i
-                lndetLzg[[lp1]] <- lndetLzi
               } else {
                 R11[[lp1]] <- rbind(R11[[lp1]], R11i)
-                lndetLzg[[lp1]] <- lndetLzg[[lp1]] + lndetLzi
+              }
+              if(length(lndetLzg) < ltop || is.null(lndetLzg[[ltop]])) {
+                lndetLzg[[ltop]] <- lndetLzi
+              } else {
+                lndetLzg[[ltop]] <- lndetLzg[[ltop]] + lndetLzi
               }
             } else {
-              lndetLzg[[groups[gi]]] <- lndetLzi
+              if(length(lndetLzg) < ltop || is.null(lndetLzg[[ltop]])) {
+                lndetLzg[[ltop]] <- lndetLzi
+              } else {
+                lndetLzg[[ltop]] <- lndetLzg[[ltop]] + lndetLzi
+              }
             }
-          } # end if(level == 1)
-          if (level>=2) {
+          } else { # end if(level == 1)
+            # level >= 2
             ZiA <- rbind(pR11[[groups[gi]]], IMat)
             R <- qr_qrr(ZiA) # probably faster than getchr(ZiA)
             # weight the results
             # groups goes back to this unit
             if (!topLevel) {
-              R11i <- sqrt(weightsC[[level+1]][gi])*ZiAR[-(1:qi),qi+1:qp1, drop=FALSE]
+              Zrows <- groupID[ , level] == groups[gi]
+              # unit ID for level above this
+              lp1 <- unique(groupID[Zrows, level+1])
+              ltop <- unique(groupID[Zrows, ncol(groupID)])
+              R11i <- sqrt(weightsC[[level+1]][gi])*R[-(1:qi), -(1:qi), drop=FALSE]
               # load in R11 (a list defined above) to the correct level
               # this if/else allows lp1 to be out of order
               if(length(R11) < lp1 || is.null(R11[[lp1]])) {
                 # there was no R11, so start it off with this R11
                 R11[[lp1]] <- R11i
-                lndetLzg[[lp1]] <- lndetLzi
               } else {
                 R11[[lp1]] <- rbind(R11[[lp1]], R11i)
-                lndetLzg[[lp1]] <- lndetLzg[[lp1]] + lndetLzi
               }
+              lndetLzi <- weights[[level+1]][groups[gi]] * sum(log(abs(Matrix::diag(R)[1:qi])))
+              lndetLzg[[ltop]] <- lndetLzg[[ltop]] + lndetLzi
             } else {
               # top level
               lndetLzi <- weights[[level+1]][groups[gi]] * sum(log(abs(Matrix::diag(R)[1:qi])))
               lndetLzg[[groups[gi]]] <- lndetLzg[[groups[gi]]] + lndetLzi
             }
-          }
+          } # end else for if(level == 1)
           lndetLz <- lndetLz + lndetLzi
         } # end for(gi in 1:length(groups))
         if(level < ncol(groupID)) {
           pR11 <- R11
         } 
       } #end for(level in 1:ncol(groupID))
-    } # end if(is.null(lndetLz0))
+    } # end if(lndetLz0)
     # this is the beta vector
     b <- ub[-(1:ncol(Z))]
     if(!is.null(beta0)) {
