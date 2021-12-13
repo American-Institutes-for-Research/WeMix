@@ -564,7 +564,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       ihes <- -1*getHessian(b2(f=bsq, optpar=opt$par, b=bhatq$b, sigma0=bhatq$sigma, inds=inds),
                                            x=c(opt$par[inds], sigma=bhatq$sigma))
       eihes <- eigen(ihes)
-      if(max(eihes$values)/min(eihes$values) >= 1/((.Machine$double.eps)^0.25)) {
+      if(min(eihes$values) <= 0 || max(eihes$values)/min(eihes$values) >= 1/((.Machine$double.eps)^0.25)) {
         warning("Numerical instability in estimating the standard error of variance terms. Consider the variance term standard errors approximate.")
         ihes <- nearPD(ihes,  posd.tol=400*sqrt(.Machine$double.eps))$mat
       }

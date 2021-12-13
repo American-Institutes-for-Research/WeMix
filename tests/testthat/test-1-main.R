@@ -17,6 +17,7 @@ sleepstudyU$weight1L2 <- 1
 
 context("The model runs")
 test_that("The model runs", {
+  wm0 <- mix(Reaction ~ Days + (1|Subject), data=sleepstudyU, weights=c("weight1L1", "weight1L2"))
   lme1 <- lmer(Reaction ~ Days + (1|Subject), data=sleepstudyU, REML=FALSE)
   expect_equal(wm0$lnl, -897.039321502613, tolerance=tolerance*897) # value from  lmer(Reaction ~ Days + (1 | Subject), data=sleepstudy, REML=FALSE)
   expect_equal(unname(c(wm0$coef)), unname(fixef(lme1)), tolerance=tolerance)
