@@ -74,6 +74,7 @@
 #' \item{cov_mat}{the variance-covariance matrix of the fixed effects.}
 #' \item{var_theta}{the variance covariance matrix of the theta terms.}
 #' \item{wgtStats}{statistics regarding weights, by level.}
+#' \item{ranefMat}{list of matrixes; each list element is a matrix of random effects by level with IDs in the rows and random effects in the columns.}
 #' @example \man\examples\mix.R
 #' @author Paul Bailey, Claire Kelley, and Trang Nguyen 
 #' @export
@@ -537,6 +538,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       message("Estimating covariance.")
     }
     bhatq <- bsq(opt$par, robustSE=TRUE) #calculate robust SE
+    uMatList <- makeUMatList(bhatq, Zlist, theta)
     b2 <- function(f, optpar, b, sigma0, inds) {
       function(x) {
         sigma <- x[length(x)]
@@ -686,7 +688,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
                invHessian=bhatq$cov_mat, ICC=ICC,
                is_adaptive=FALSE, sigma=bhatq$sigma, cov_mat=bhatq$varBetaRobust,
                ngroups=ngroups, varDF=varDF, varVC=varVC,var_theta=var_of_var,
-               wgtStats=ngrpW)
+               wgtStats=ngrpW, ranefMat = uMatList)
     class(res) <- "WeMixResults"
     return(res)
   }

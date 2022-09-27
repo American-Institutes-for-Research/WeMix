@@ -1,10 +1,18 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
-\section{Changes in version 3.2.1.9000}{
+\section{Changes in version 3.3.2}{
+  \subsection{BUG FIXES}{
+    \itemize{
+      \item minor update related to the new CRAN checks.
+    }
+  }
+}
+\section{Changes in version 3.3.0}{
   \subsection{IMPROVEMENTS}{
     \itemize{
       \item WeMix now fits linear models with any number of levels and has been tested with 4-level models.
+      \item WeMix now returns a nicer version of the random effects in the object \code{ranefMat}
     }
   }
 }

@@ -80,13 +80,13 @@ print.WeMixWaldTest <- function(x, ...) {
   cat("\n\nDegrees of Freedom\n")
   cat(x$df)
   cat("\n\nNull Hypothesis\n")
-  if (class(x$H0)=="matrix"){
+  if (inherits(x$H0, "matrix")){
     print(apply(x$H0,FUN=round,digits=4,MARGIN=c(1:length(dim(x$H0)))))
   } else {
     print(round(x$H0,4))
   }
   cat("\n\nAlternative Hypothesis\n")
-  if (class(x$HA)=="matrix"){
+  if (inherits(x$HA, "matrix")){
     print(apply(x$HA,FUN=round,digits=4,MARGIN=c(1:length(dim(x$H0)))))
   } else {
     print(round(x$HA,4))
@@ -359,4 +359,42 @@ makeSandwich <- function(fittedModel) {
 # useful for finding columns with non-zero entries in lapply
 nozero <- function(x) {
   any(x != 0)
+}
+
+# turns fit random effects into a list of matrixes, one per group level, with effects by group
+#
+# @param bhatq, with fit random effects
+# @param Zlist the Z matrix list, by level, used to map random effects to groups
+# @param theta the names of which are used to get the structure and column names for results
+# 
+# assumes every effect is occupied (has a column in Z) and throws an error if this is not the case
+makeUMatList <- function(bhatq, Zlist, theta) {
+  splitEffects <- strsplit(x=names(theta), split="[.]")
+  firstEffects <- sapply(splitEffects, function(x) { x[1] } )
+  ufirstEffects <- unique(firstEffects)
+  if(length(ufirstEffects) != length(Zlist)) {
+    stop("unable to form covariates matrix. You may need to rename grouping factors without periods.")
+  }
+  res <- list()
+  u <- bhatq$ranef
+  for(zi in 1:length(Zlist)) {
+    firstEi <- ufirstEffects[zi]
+    selected <- which(firstEffects==firstEi & lapply(splitEffects, length) == 2)
+    effectNamesi <- unlist(lapply(selected, function(si) { splitEffects[[si]][-1] } ))
+    bs <- bhatq$ranef[[zi+1]]
+    cnZi <- colnames(Zlist[[zi]])
+    ucnZi <- unique(cnZi)
+    if( length(bs)/length(selected) - round(length(bs)/length(selected)) > sqrt(.Machine$double.eps) ) {
+      stop(paste0("unable to form covariates matrix. Number of random effects per group is non-integer at level ", zi +1, " with ", length(bs), " effects  and ", length(selected), " per unit."))
+    }
+    bsmat <- matrix(NA, ncol=length(selected), nrow=round(length(bs)/length(selected)), dimnames=list(ucnZi, effectNamesi))
+    for(ei in 1:length(ucnZi)) {
+      bsmat[ei,] <- bs[cnZi == ucnZi[ei]]
+    }
+    bsmatr <- data.frame(bsmat)
+    colnames(bsmatr) <- colnames(bsmat)
+    res <- c(res, list(bsmatr))
+  }
+  names(res) <- ufirstEffects
+  return(res)
 }
