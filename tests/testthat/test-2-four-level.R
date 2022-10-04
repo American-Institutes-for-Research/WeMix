@@ -1,4 +1,5 @@
 require(testthat)
+skip_on_cran()
 
 # for sleepstudy, calls in here to lmer
 library(lme4)
@@ -13,6 +14,7 @@ data("sleepstudy")
 
 context("four level model")
 test_that("unweighted four level model v lmer", {
+  skip_on_cran()
   sleepstudy2 <- sleepstudy
   sleepstudy2$Group <- 1
   sleepstudy2$Group <- ifelse(sleepstudy2$Subject %in% c("310", "309", "349", "335"), 2, sleepstudy2$Group)
@@ -46,6 +48,7 @@ test_that("unweighted four level model v lmer", {
 
 
 test_that("Weighted v unweighted replicated four level model", {
+  skip_on_cran()
   sleepstudy2 <- sleepstudy
   sleepstudy2$Group <- 1
   sleepstudy2$Group <- ifelse(sleepstudy2$Subject %in% c("310", "309", "349", "335"), 2, sleepstudy2$Group)

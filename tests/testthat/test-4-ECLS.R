@@ -1,4 +1,5 @@
 require(testthat)
+skip_on_cran()
 
 options(width = 500)
 options(useFancyQuotes = FALSE)
