@@ -86,6 +86,7 @@ This is a list with elements:
 \item{cov_mat}{the variance-covariance matrix of the fixed effects.}
 \item{var_theta}{the variance covariance matrix of the theta terms.}
 \item{wgtStats}{statistics regarding weights, by level.}
+\item{ranefMat}{list of matrixes; each list element is a matrix of random effects by level with IDs in the rows and random effects in the columns.}
 }
 \description{
 Implements a survey weighted mixed-effects model using the provided formula.

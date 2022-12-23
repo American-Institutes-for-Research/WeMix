@@ -1,18 +1,29 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
-\section{Changes in version 3.3.2}{
+\section{Changes in version 3.3.0}{
+  \subsection{IMPROVEMENTS}{
+    \itemize{
+      \item many warnings and errors are now clearer
+    }
+  }
   \subsection{BUG FIXES}{
     \itemize{
-      \item minor update related to the new CRAN checks.
+      \item group mean centering and grand mean centering now calculate averages correctly for unbalanced data
+      \item group and grand mean centering now always use the level-1 weights
     }
   }
 }
-\section{Changes in version 3.3.0}{
+\section{Changes in version 3.2.2}{
   \subsection{IMPROVEMENTS}{
     \itemize{
       \item WeMix now fits linear models with any number of levels and has been tested with 4-level models.
       \item WeMix now returns a nicer version of the random effects in the object \code{ranefMat}
+    }
+  }
+  \subsection{BUG FIXES}{
+    \itemize{
+      \item minor update related to the new CRAN checks.
     }
   }
 }

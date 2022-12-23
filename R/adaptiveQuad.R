@@ -104,7 +104,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(!inherits(run, "logical")) stop(paste0("The argument ", sQuote("run"), " must be a logical."))
   if(!inherits(verbose, "logical")) stop(paste0("The argument ", sQuote("verbose"), " must be a logical."))
   if(!inherits(weights, "character")) stop(paste0("The argument ", sQuote("weights"), " must be a character vector of weight column names in ", sQuote("data"), "."))
-  if(any(!weights %in% colnames(data))) stop(paste0("The argument ", sQuote("weights"), " must specify valid columns in ", sQuote("data"), "."))
+  if(any(!weights %in% colnames(data))) stop(paste0("The argument ", sQuote("weights"), " must specify valid columns in ", sQuote("data"), ". Could not find column(s): ", paste(dQuote(weights[!weights %in% colnames(data)]), collapse=", "), "."))
   if(acc0 <= 0) stop(paste0("The argument ", sQuote("acc0"), " must be a positive integer."))
   if(!missing(fast)) warning(paste0("The ", sQuote("fast"), " argument is deprecated."))
   if(any(grepl("[|].*[.]",attributes(terms(formula))$term.labels))) stop("The formula is not valid for mix. The name of conditioning variables must not contain a dot. Try renaming variables after | in the fomrula so they do not contain a dot.")
@@ -119,51 +119,13 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     data <- dt 
     rm(dt)
   }
-  if(length(weights) == 1) {
-    # if the length of weights is 1 then below subsets on weights do not work.
-    stop(paste0("The argument ", sQuote("weights"), " must be a list of column names with length equal to levels."))
-  }
-  #this removes any zero weight cases if they exist 
-  data[apply(data[ , weights] <= 0, 1, any), weights] <- NA
-  if(any(is.na(data[ , weights]))) {
-    warning(paste0("There were ", sum(complete.cases(data)==FALSE), " rows with non-positive weights. These have been removed."))
-    data <- data[complete.cases(data), ]
-  }
-  
-  # setup family
-  # if family is set, use it
-  if(!is.null(family)) {
-    if(inherits(family, "character")) {
-      family <- do.call(family, args=list())
-    }
-    if(!inherits(family, "family")) {
-      stop(paste0("The family argument must be of class ", dQuote("family"), "."))
-    }
-    family$lnl <- switch(family$family,
-      binomial = function(y, mu, w, sd) {
-                   w * dbinom(x=y, size=rep(1,length(y)), prob=mu, log=TRUE)
-                 },
-      poisson = function(y, mu, w, sd) {
-                   w * dpois(x=y, lambda=mu, log=TRUE)
-                 },
-      gaussian = function(y, mu, w, sd) {
-                   w * dnorm(x=y, mean=mu, sd=sd, log=TRUE)
-                 },
-      Gamma = function(y, mu, w, sd) {
-              stop("The gamma family is not implemented.")
-                 },
-      inverse.gaussian = function(y, mu, w, sd) {
-                   stop("The inverse Gaussian family is not implemented.")
-                 },
-      function(y, mu, w, sd) {
-        stop(paste0("Unknown family."))
-      }
-    )
-  }
+  weights0 <- weights # keep track of incomming weights column names
+  data <- dropNonPositiveWeights(data, weights)
+
+  family <- setup_family(family)
 
   # set up initial values 
   adapter <- "MAP" # initial function evaluation through MAP, BLUE estimator can be used post hoc
-  weights0 <- weights # keep track of incomming weights column names
   # correctly format acc0
   acc0 <- round(acc0)
   nQuad <- round(nQuad) #nquad must be an integer
@@ -184,68 +146,15 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # reorder data by groups (in order to make Z matrix obtained from lme easier to work with)
   data <- data[do.call(order, lapply(rev(groupNames), function(colN) data[ , colN])), ]
   
-  if(!is.null(center_group)) {
-    #first add nested variables to data set if they exist, this is to handle / and : in group vars
-    if (any(grep(":|/", names(center_group)))) {
-      nested_groups <- names(center_group)[grep(":|/", names(center_group))]
-      for (var in nested_groups){
-        vars <- unlist(strsplit(var , ":|/"))
-        data[,var] <- paste0(data[ , vars[1]], ":", data[ , vars[2]])
-      }
-    } #end of if there are : and / 
-    if(!all(names(center_group) %in% names(data))){
-      stop("Not all centering group variables are found in the data set. ")
-    } else {
-      for(name in names(center_group)) {
-        # loop is included here for centering at >2 levels 
-        # we need to get variable names from model matrix becasue of factor transformations
-        # remove the first element becasue it is the intercept
-
-        # identify level--it is the minimum group to account for : and / specified groups
-        lev <- min(which(groupNames %in% unlist(strsplit(name,":|/"))))
-        X <- sparse.model.matrix(center_group[[name]],data=data)
-        vars <- colnames(X)[-1]
-        X <- cbind(X, data[ , weights0[lev]])
-        colnames(X)[ncol(X)] <- weights0[lev]
-        # subtract group average from value and put back into data 
-        # including scaling factor that accoutns for the fact weights might not sum to 0 l
-        data[ , vars] <- sapply(vars, function(var){
-                           X[ , var] - 
-                             ave(X[ , var] * X[ , weights0[lev]], data[ , name])/
-                             (nrow(X)/sum(X[ , weights0[lev]]))
-                         })
-        # only used for centering
-        rm(X)
-      } # end for(name in names(center_group))
-    } # end else for loop mean centering varibles 
-  } # end if(!is.null(center_group))
-   
-  if(!is.null(center_grand)){
-    X <- sparse.model.matrix(center_grand, data=data)
-    vars <- colnames(X)[-1]
-    
-    #subtract overall avvrage from value and put back into X 
-    data[ , vars] <- sapply(vars, function(var){X[ , var] - ave(X[ , var])})
-    # only used for centering
-    rm(X)
-  }
+  data <- do_center_group(center_group, data, groupNames, weights0)
+  data <- do_center_grand(center_grand, data, weights0)
 
   # remove row names so that resorted order is used in lme model 
   row.names(data) <- NULL
   
   # run lmer to get a ballpark fit and model structure information
-  if(is.null(family)) {
-    if(verbose) {
-      cat("Using lmer to get an approximate (unweighted) estimate and model structure.\n")
-    }
-    # warnings happen on e.g. near-singular solve and are not a concern
-    suppressWarnings(lme <- lmer(formula, data, REML=FALSE))
-  } else {
-    if(verbose) {
-      cat("Using glmer to get an approximate (unweighted) estimate and model structure.\n")
-    }
-    lme <- glmer(formula, data, family=family)
-  }
+  lme <- fit_unweighted_model(formula, data, family, verbose)
+
   # get y, test for validity
   mf <- model.frame(lme)
   responseCol <- attributes(attributes(mf)$terms)$response
@@ -255,7 +164,9 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       y <- ifelse(y == min(y), 0, 1)
     }
     if(any(!y %in% c(0,1))) {
-      stop("For a binomial model the outcomes must be 0 or 1.")
+      bady <- unique(y)
+      bady <- bady[1:(min(length(bady), 5))]
+      stop("For a binomial model the outcomes must be 0 or 1. Examples of values found:", paste(bady, collapse=", "))
     }
   }
   # Get the Z (random effects) matrix from LME 
@@ -265,16 +176,11 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   
   #now capture interactions
   all_groups <- names(summary(lme)$ngrps)
-  groupNames <- all_groups  
-  
+  groupNames <- all_groups
+
   # store the full sample weights (or cWeights) in wgts0
-  wgts0 <- data[ , weights]
-  if(cWeights) {
-    for(i in (ncol(wgts0)-1):1) {
-      wgts0[ , i] <- wgts0[ , i] * wgts0[ , i+1]
-    }
-  }
-  # check if weights are potentially conditional
+  # must happen after sorting so it is sorted correctly
+  wgts0 <- getWgts0(data, weights, cWeights)
 
   # create columns for any interactions coming from the formula
   # this will be mainly used in 3 level models and is included for forward compatability 
@@ -283,8 +189,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # drop levels of factors in present vars
   presentVars <- all_groups[all_groups %in% names(data)]
   for(i in seq_along(presentVars)) {
-    if(inherits(data[, presentVars[i]], "factor")) {
-      data[, presentVars[i]] <- droplevels(data[, presentVars[i]])
+    if(inherits(data[ , presentVars[i]], "factor")) {
+      data[ , presentVars[i]] <- droplevels(data[, presentVars[i]])
     }
   }
 
@@ -340,7 +246,9 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #calculate n levels from Z and warn if not the same dimension as weights 
   levels <- length(Z)
   if(length(weights) != levels) {
-    stop(paste0("The argument ", sQuote("weights"), " must be a list of column names with length equal to levels."))  
+    stop(paste0("The argument ", dQuote("weights"),
+                " must be a vector of column names with length equal to levels. length ",
+                dQuote("weights"), " is ", length(weights), ", expecting ", levels))
   }
   
   # transform weights into a list of  dataframes where each data frame has
@@ -355,22 +263,22 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     if(i > 1) {
       # for levels >1 data frame indexed by group name and values represent weights 
       df$index <- data[ , all_groups[i-1]]
-      # return 0 var if there is only one unit
-      rvar <- function(x) {
-        if(length(x) <=1) {
-          return(0)
-        } else {
-          return(var(x))
-        }
-      }
       agg <- aggregate(w ~ index, data=df, FUN=rvar)
       if(any(agg$w > sqrt(.Machine$double.eps))) {
-        stop(paste0("Some level-", i+1, " weights vary within group."))
+        # filter to just non-zero SD cases
+        agg <- agg[agg$w > sqrt(.Machine$double.eps), ]
+        colnames(agg) <- c("index", "Std. Dev.")
+        message("Cases with non-zero standard deviation of group weight, within group:")
+        print(agg, row.names=FALSE)
+        stop(paste0("Some level-", i, " weights vary within group."))
       }
       df <- df[!duplicated(df$index), ]
     }
     weights[[i]] <- df
   }
+
+
+
   #get the y variable name from the formula 
   y_label <- as.character(formula[[2]])
   
@@ -383,6 +291,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(length(unique(ngrp)) != length(ngrp)) {
     # if non-nested groups are present (ie not all obs at lower levels are part of upper level groups) 
     # then there will be non unique entries in ngrp 
+    message("Groups n-sizes:")
+    print(ngrp)
     stop("This does not appear to be a nested model. Some levels of this model have the same number of subject/groups as the level above them.")
   }
   ngrpW <- lapply(weights, function(wdf) {
@@ -393,6 +303,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   lmeVarDF <- data.frame(lmesummary$varcor)
   parlme <- c(parlme, lmeVarDF$vcov)
   
+
+
   # use initial values for coefficients if they are provied, otherwise default to lme4
   if(is.null(start)) {
     est0 <- parlme
@@ -441,6 +353,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
 
   # use helper funtion to create a covariance matrix from the data frame with variance and covariance information
   covarianceConstructor <- covMat2Cov(lmeVarDF)
+
 
   # C is the realization of the covariance constructor
   C <- covarianceConstructor(est0[-(1:k)])
@@ -1522,3 +1435,178 @@ adapterLnL <- function(y, X, levels, Z, ZFull, weights, k, qp,
     loglikelihoodByGroup + posteriorByGroup
   } #ends  funciton to be return function(par, long=FALSE) 
 } 
+
+
+dropNonPositiveWeights <- function(data, weights) {
+  #this removes any zero weight cases if they exist 
+  dataW <- data[, weights, drop=FALSE]
+  dataW[apply(dataW <= 0, 1, any), ] <- NA
+  if(any(!complete.cases(dataW))) {
+    warning(paste0("There were ", sum(complete.cases(dataW)==FALSE), " rows with non-positive weights. These have been removed."))
+    data <- data[complete.cases(dataW), ]
+  }
+  return(data)
+}
+
+getWgts0 <- function(data, weights, cWeights) {
+  wgts0 <- data[ , weights]
+  if(cWeights) {
+    for(i in (ncol(wgts0)-1):1) {
+      wgts0[ , i] <- wgts0[ , i] * wgts0[ , i+1]
+    }
+  }
+  return(wgts0)
+}
+
+sumsq <- function(x) {
+  sum(x^2)
+}
+
+reweight <- function(data, level, method, data_m1=NULL) {
+  if(length(method) > 1) {
+    message("Length of method larger than one, using first method: ", dQuote(method), ".")
+    method <- method[1]
+  }
+  if(!method %in% c("sample size", "effective sample size")) {
+    stop("Unknown re-weighting method: ", dQuote(method), ".")
+  }
+  data$w0 <- data$w
+  if("indexp1" %in% colnames(data)) {
+    data$sumn <- ave(data$w, data$indexp1, FUN=length)
+    data$sumw <- ave(data$w, data$indexp1, FUN=sum)
+    data$sumw2 <- ave(data$w, data$indexp1, FUN=sumsq)
+  } else {
+    data$sumn <- ave(data$w, data$index, FUN=length)
+    data$sumw <- ave(data$w, data$index, FUN=sum)
+    data$sumw2 <- ave(data$w, data$index, FUN=sumsq)
+  }
+  if(method %in% "sample size") {
+    data$w <- data$w0 * data$sumn / data$sumw
+  }
+  if(method %in% "effective sample size") {
+    data$w <- data$w0 * data$sumw / data$sumw2
+  }
+  return(data)
+}
+
+do_center_group <- function(center_group, data, groupNames, weights0) {
+  if(!is.null(center_group)) {
+    #first add nested variables to data set if they exist, this is to handle / and : in group vars
+    if (any(grep(":|/", names(center_group)))) {
+      nested_groups <- names(center_group)[grep(":|/", names(center_group))]
+      for (var in nested_groups){
+        vars <- unlist(strsplit(var , ":|/"))
+        data[,var] <- paste0(data[ , vars[1]], ":", data[ , vars[2]])
+      }
+    } #end of if there are : and / 
+    if(!all(names(center_group) %in% names(data))){
+      unfound_names <- names(center_group)[!names(center_group) %in% names(data)]
+      stop("Not all centering group variables are found in the data set. Names include:", paste(unfound_names, collapse=", "))
+    }
+    if(length(center_group) != length(names(center_group))) {
+      stop(paste0("The argument ", dQuote("center_group"), " must be a list where each element is the name of levels."))
+    }
+    for(name in names(center_group)) {
+      # loop is included here for centering at >2 levels 
+      # we need to get variable names from model matrix becasue of factor transformations
+      # remove the first element becasue it is the intercept
+
+      # identify level--it is the minimum group to account for : and / specified groups
+      if(!inherits(center_group[[name]], "formula")) {
+        stop("the ", dQuote("center_group"), " argument must be a list of formulas.")
+      }
+      X <- sparse.model.matrix(center_group[[name]], data=data)
+      vars <- colnames(X)
+      if(attr(terms(center_group[[name]]), "intercept") %in% 1) {
+        vars <- vars[-1]
+      }
+      if(!all(vars %in% colnames(data))) {
+        stop("could not find variable(s) in the ", dQuote("center_group"), " list element ", dQuote(name), " ", paste(vars[!vars %in% colnames(data)], collapse=", "))
+      }
+      if(!all(unlist(strsplit(name,":|/")) %in% groupNames)) {
+        stop("the ", dQuote("center_group"), " argument must be a list with names that are group level names. Could not find level of ", dQuote(name), " in list of level grouping variables: ", paste(dQuote(unique(groupNames)), collapse=", "),".")
+      }
+      lev <- 1 # use level 1 weights
+      # subtract group average from value and put back into data 
+      # including scaling factor that accoutns for the fact weights might not sum to 0 l
+      data[ , vars] <- sapply(vars, function(var){
+                        # X - weighted group average X
+                        data[ , var] - 
+                          ave(X[ , var] * data[ , weights0[lev]], data[ , name], FUN=sum) /
+                          ave(data[ , weights0[lev]], data[ , name], FUN=sum)
+                      })
+      rm(X)
+    } # end for(name in names(center_group))
+  } # end if(!is.null(center_group))
+  return(data)
+}
+
+do_center_grand <- function(center_grand, data, weights0) {
+  if(!is.null(center_grand)){
+    X <- sparse.model.matrix(center_grand, data=data)
+    vars <- colnames(X)
+    if(attr(terms(center_grand), "intercept") %in% 1) {
+      vars <- vars[-1]
+    }
+    #subtract overall average from value and put back into X 
+    for(var in vars) {
+      data[ , var] <- data[ , var] - sum(X[ , var] * data[ , weights0[1]]) / sum(data[ , weights0[1]])
+    }
+    rm(X)
+  }
+  return(data)
+}
+
+setup_family <- function(family) {
+  # setup family
+  # if family is set, use it
+  if(!is.null(family)) {
+    if(inherits(family, "character")) {
+      family <- do.call(family, args=list())
+    }
+    if(!inherits(family, "family")) {
+      stop(paste0("The family argument must be of class ", dQuote("family"), "."))
+    }
+    if(!family$family %in% c("binomial", "poisson", "gaussian")) {
+      stop("Unimplemented family, ", dQuote(family$family))
+    }
+    family$lnl <- switch(family$family,
+      binomial = function(y, mu, w, sd) {
+                   w * dbinom(x=y, size=rep(1,length(y)), prob=mu, log=TRUE)
+                 },
+      poisson = function(y, mu, w, sd) {
+                   w * dpois(x=y, lambda=mu, log=TRUE)
+                 },
+      gaussian = function(y, mu, w, sd) {
+                   w * dnorm(x=y, mean=mu, sd=sd, log=TRUE)
+                 }
+    )
+  }
+  return(family)
+}
+
+fit_unweighted_model <- function(formula, data, family, verbose) {
+  if(is.null(family)) {
+    if(verbose) {
+      cat("Using lmer to get an approximate (unweighted) estimate and model structure.\n")
+    }
+    # warnings happen on e.g. near-singular solve and are not a concern
+    suppressWarnings(lme <- lmer(formula, data, REML=FALSE))
+  } else {
+    if(verbose) {
+      cat("Using glmer to get an approximate (unweighted) estimate and model structure.\n")
+    }
+    lme <- glmer(formula, data, family=family)
+  }
+  return(lme)
+}
+
+# return 0 var if there is only one unit
+#' @importFrom stats var
+rvar <- function(x) {
+  if(length(x) <=1) {
+    return(0)
+  } else {
+    return(var(x))
+  }
+}

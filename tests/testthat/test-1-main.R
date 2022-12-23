@@ -557,9 +557,6 @@ test_that("Three level model slash and colon", {
   expect_equal(unname(coef(wm0)), unname(fixef(lmr)), tol=1e-6)
   expect_equal(unname(wm0$vars[length(wm0$vars)]), unname(lmr@devcomp$cmp["sigmaML"]^2), tol=1e-4)
   
-  # non-nested model
-  #lmr <- lmer(Reaction ~ Days + (1|Subject/Group), data=sleepstudy2, REML=FALSE)
-  expect_error(wm0 <- mix(Reaction ~ Days + (1|Subject/Group), data=ss2, weights=c("w1", "w2", "w3")))
 })
 
 # check the format of summary output
