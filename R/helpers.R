@@ -17,14 +17,21 @@ print.WeMixResults <- function(x, ...) {
 #' @export
 summary.WeMixResults <- function(object, ...) {
   x0 <- object
-  
   #for adaptive quad models 
   if(object$is_adaptive){
     VC <- makeSandwich(object) # calculates the sandwhich estimator of variance 
     object$vc <- VC$VC #sets variances returned by model to variances calculated by sandwich estimator
     se <- VC$se[1:length(x0$coef)]
     re_se <- VC$se[-(1:length(x0$coef))] #not used currently 
-    x0$varVC <- list(NULL,VC$VC[names(x0$vars),names(x0$vars)]) #This is hard coded for 2 levels, with a NULL because the are no refs at level 1
+    if(object$levels == 2){
+      x0$varVC <- list(NULL,VC$VC[names(x0$vars),names(x0$vars)])
+    }else{
+      x0$varVC <- list(NULL,
+                       VC$VC[grep(names(object$ngroups)[2],colnames(VC$VC)),
+                             grep(names(object$ngroups)[2],colnames(VC$VC))],
+                       VC$VC[grep(names(object$ngroups)[3],colnames(VC$VC)),
+                             grep(names(object$ngroups)[3],colnames(VC$VC))])
+    }
     # build the var mat output, first adding SEvcov
     varDF <- x0$varDF
     varDF$SEvcov <- NA
@@ -50,6 +57,7 @@ summary.WeMixResults <- function(object, ...) {
   # add variance estimates
   colnames(varsmat) <- c("Level", "Group", "Name", "Variance", "Std. Error", "Std.Dev.")
   for(li in 2:x0$levels) {
+    #browser()
     vc <- as.matrix(x0$varVC[[li]])
     cr <- cov2cor(vc)
     if(ncol(vc)>1) {
@@ -331,7 +339,6 @@ makeSandwich <- function(fittedModel) {
   par <- c(fittedModel$coef, fittedModel$vars)
   FisherInfInverse <- solve(fittedModel$invHessian)
   
-  
   L <- jacobian(fittedModel$lnlf, par, top=FALSE)
   nGroups <- nrow(L)
   nParams <- length(par)
@@ -347,7 +354,6 @@ makeSandwich <- function(fittedModel) {
   #return NA for obs with variance below threshold 
   se[which(log(fittedModel$vars) < -3.6) + length(fittedModel$coef) ] <- NA
   diag(SE) <- se^2 
-  
   names(se) <- colnames(SE)
   
   return(list(VC=SE,se=se)) 

@@ -2,6 +2,14 @@
 \title{NEWS for WeMix}
 
 \section{Changes in version 3.3.0}{
+  \subsection{NEW FEATURES}{
+    \itemize{
+      \item the \code{mix} function now fits weighted binomial and Poisson models with up to three levels. This update uses, at the user's request the LaPlace approximation or adaptive Gauss-Hermite Quadrature (AGHQ). To achieve that, we use penalized iteratively reweighted least squares (PIRLS) with code based on \code{lme4pureR} package by Steve Walker and Doug Bates. Use \code{nQuad=1} for LaPlace, and \code{nQuad>1} for AGHQ.
+      \item because  of this change the \code{mix} argument \code{acc0} is now deprecated and will be ignored.
+    }
+  }
+}
+\section{Changes in version 3.3.0}{
   \subsection{IMPROVEMENTS}{
     \itemize{
       \item many warnings and errors are now clearer
@@ -127,8 +135,8 @@
 \section{Changes in version 3.1.3}{
   \subsection{BUG FIXES}{
     \itemize{
-      \item The method used to determine the rank of a matrix was brought into agreement with the \code{base} package when the matrix was a base matrix. Prior to this it was possible to get an error from a call to \code{mix} that should have returned. Now these calls to \code{mix} should return. Thanks to Christian Kjeldsen of Aarhus University, Danish School of Education, for pointing this issue out.
-      \item The Wald test now works for generalized linear models instead of throwing an error. Thanks to Christian Kjeldsen for pointing this issue out as well.
+      \item The method used to determine the rank of a matrix was brought into agreement with the \code{base} package when the matrix was a base matrix. Prior to this it was possible to get an error from a call to \code{mix} that should have returned. Now these calls to \code{mix} should return. Thanks to Christian Christrup Kjeldsen of Aarhus University, Danish School of Education, for pointing this issue out.
+      \item The Wald test now works for generalized linear models instead of throwing an error. Thanks to Christian Christrup Kjeldsen for pointing this issue out as well.
     }
   }
 }

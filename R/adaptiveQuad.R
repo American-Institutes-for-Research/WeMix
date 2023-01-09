@@ -18,10 +18,10 @@
 #' @param keepAdapting logical, set to \code{TRUE} when the adaptive quadrature should adapt after every Newton step. Defaults to \code{FALSE}. 
 #' \code{FALSE} should be used for faster (but less accurate) results. Only applies to non-linear models. 
 #' @param verbose logical, default \code{FALSE}; set to \code{TRUE} to print results of intermediate steps of adaptive quadrature. Only applies to non-linear models.
-#' @param acc0 integer, the precision of \code{mpfr}, default 120. Only  applies to non-linear models. 
 #' @param start optional numeric vector representing the point at which the model should start optimization; takes the shape of c(coef, vars) 
 #' from results (see help). 
 #' @param family the family; optionally used to specify generalized linear mixed models. Currently only \code{binomial(link="logit")} is supported.
+#' @param acc0 deprecated; ignored. 
 #' @param fast logical; deprecated
 #' @description
 #' Implements a survey weighted mixed-effects model using the provided formula. 
@@ -46,11 +46,12 @@
 #' speed; estimation time increases quadratically with the number of points chosen. In addition, an odd number of points is 
 #' traditionally used. We recommend starting at 13 and increasing or decreasing as needed. 
 #' }
-#' @importFrom lme4 getME lmer glmer lFormula
-#' @importFrom stats dnorm aggregate terms dpois dgamma dbinom ave model.matrix terms.formula as.formula sigma complete.cases
+#' @importFrom lme4 getME lmer glmer lFormula GHrule
+#' @importFrom stats dnorm aggregate terms dpois dgamma dbinom ave model.matrix terms.formula as.formula sigma complete.cases update
 #' @importFrom numDeriv genD hessian grad
 #' @importFrom minqa bobyqa 
-#' @importFrom Matrix nearPD sparse.model.matrix
+#' @importFrom Matrix nearPD sparse.model.matrix Cholesky Matrix .updateCHMfactor
+#' @importFrom matrixStats rowLogSumExps
 #' @return object of class \code{WeMixResults}. 
 #' This is a list with elements: 
 #' \item{lnlf}{function, the likelihood function.} 
@@ -76,7 +77,7 @@
 #' \item{wgtStats}{statistics regarding weights, by level.}
 #' \item{ranefMat}{list of matrixes; each list element is a matrix of random effects by level with IDs in the rows and random effects in the columns.}
 #' @example \man\examples\mix.R
-#' @author Paul Bailey, Claire Kelley, and Trang Nguyen 
+#' @author Paul Bailey, Blue Webb, Claire Kelley, and Trang Nguyen 
 #' @export
 mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
                 center_grand=NULL, max_iteration=10, nQuad=13L, run=TRUE,
@@ -100,12 +101,12 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(length(class(data)) > 1) { 
     data <- as.data.frame(data)
   }
+  if(!missing(acc0)) message("The argument acc0 is now deprecated and will be ignored.")
   if(nQuad <= 0) stop(paste0("The argument ", sQuote("nQuad"), " must be a positive integer."))
   if(!inherits(run, "logical")) stop(paste0("The argument ", sQuote("run"), " must be a logical."))
   if(!inherits(verbose, "logical")) stop(paste0("The argument ", sQuote("verbose"), " must be a logical."))
   if(!inherits(weights, "character")) stop(paste0("The argument ", sQuote("weights"), " must be a character vector of weight column names in ", sQuote("data"), "."))
   if(any(!weights %in% colnames(data))) stop(paste0("The argument ", sQuote("weights"), " must specify valid columns in ", sQuote("data"), ". Could not find column(s): ", paste(dQuote(weights[!weights %in% colnames(data)]), collapse=", "), "."))
-  if(acc0 <= 0) stop(paste0("The argument ", sQuote("acc0"), " must be a positive integer."))
   if(!missing(fast)) warning(paste0("The ", sQuote("fast"), " argument is deprecated."))
   if(any(grepl("[|].*[.]",attributes(terms(formula))$term.labels))) stop("The formula is not valid for mix. The name of conditioning variables must not contain a dot. Try renaming variables after | in the fomrula so they do not contain a dot.")
   #currently wemix can only use complete cases
@@ -126,8 +127,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
 
   # set up initial values 
   adapter <- "MAP" # initial function evaluation through MAP, BLUE estimator can be used post hoc
-  # correctly format acc0
-  acc0 <- round(acc0)
   nQuad <- round(nQuad) #nquad must be an integer
   
   # get the group names (ie level 2+ variables) from the formula
@@ -177,10 +176,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #now capture interactions
   all_groups <- names(summary(lme)$ngrps)
   groupNames <- all_groups
-
-  # store the full sample weights (or cWeights) in wgts0
-  # must happen after sorting so it is sorted correctly
-  wgts0 <- getWgts0(data, weights, cWeights)
 
   # create columns for any interactions coming from the formula
   # this will be mainly used in 3 level models and is included for forward compatability 
@@ -242,7 +237,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       nz[[i]] <- ncol(Z[[i]])
     }
   }
-  
   #calculate n levels from Z and warn if not the same dimension as weights 
   levels <- length(Z)
   if(length(weights) != levels) {
@@ -251,19 +245,44 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
                 dQuote("weights"), " is ", length(weights), ", expecting ", levels))
   }
   
+  # store the full sample weights (or cWeights) in wgts0
+  # we also want conditional weights
+  wgts0 <- wgtsC <- data[ , weights]
+  if(cWeights) {
+    for(i in (ncol(wgts0)-1):1) {
+      wgts0[ , i] <- wgts0[ , i] * wgts0[ , i+1]
+    }
+  }else{
+    for(i in (ncol(wgtsC)-1):1) {
+      wgtsC[ , i] <- wgtsC[ , i]/wgtsC[ , i+1]
+    }
+  }
+  
+  # check if weights are potentially conditional
+  # must happen after sorting so it is sorted correctly
+  wgts0 <- getWgts0(data, weights, cWeights)
+  wgtsC <- getWgtsC(data, weights, cWeights)
+  
+  nRE <- list()
+  for(i in 1:(levels-1)){
+    nRE[[i]] <- ncol(Z[[i+1]])
+  }
   # transform weights into a list of  dataframes where each data frame has
   # columns representing unit weight at that level and index of group names 
-  weights <- list()
+  weights <- weights_cond <- list()
   for(i in 1:length(nz)) {
     df <- data.frame(w=unname(wgts0[ , i]), stringsAsFactors=FALSE)
+    dfC <- data.frame(w=unname(wgtsC[ , i]), stringsAsFactors=FALSE)
     # add the index for this level, when there is one
     if(i < length(nz)) {
-      df$indexp1 <- data[ , all_groups[i]]
+      df$indexp1 <- dfC$indexp1 <- data[ , all_groups[i]]
+      
     }
     if(i > 1) {
       # for levels >1 data frame indexed by group name and values represent weights 
-      df$index <- data[ , all_groups[i-1]]
+      df$index <- dfC$index <- data[ , all_groups[i-1]]
       agg <- aggregate(w ~ index, data=df, FUN=rvar)
+      aggC <- aggregate(w ~ index, data=dfC, FUN=rvar)
       if(any(agg$w > sqrt(.Machine$double.eps))) {
         # filter to just non-zero SD cases
         agg <- agg[agg$w > sqrt(.Machine$double.eps), ]
@@ -273,8 +292,10 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
         stop(paste0("Some level-", i, " weights vary within group."))
       }
       df <- df[!duplicated(df$index), ]
+      dfC <- dfC[!duplicated(dfC$index), ]
     }
     weights[[i]] <- df
+    weights_cond[[i]] <- dfC
   }
 
 
@@ -302,8 +323,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # set up variance and coefficients 
   lmeVarDF <- data.frame(lmesummary$varcor)
   parlme <- c(parlme, lmeVarDF$vcov)
-  
-
 
   # use initial values for coefficients if they are provied, otherwise default to lme4
   if(is.null(start)) {
@@ -613,353 +632,91 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(verbose) {
     cat("Identifying initial integration locations estimates for random effects.\n")
   }
+  
+  n_l2 <- unique(lmeVarDF$ngrp[lmeVarDF$level == 2])
+  n_top <- unique(lmeVarDF$ngrp[lmeVarDF$level == max(lmeVarDF$level)])
 
-  # setup these methods that, theoretically, can be used to find the 
-  # adaptive integration points. For now, only MAP works.
-  # Note: MAP finds the maximum of the likelihood surface.
-  # it is not, properly, a MAP
+  l2_group_sizes <- as.vector(table(data[[unique(lmeVarDF$grp[lmeVarDF$level==2])]]))
+  group_sizes <- as.vector(table(aggregate(.~data[[groupNames[1]]],data,unique)[[unique(lmeVarDF$grp[lmeVarDF$level==max(lmeVarDF$level)])]]))
 
-  MAP0 <- MAP(groups=data[ , all_groups, drop=FALSE], y=y, X=X, levels=levels,
-              Z=Z, ZFull=ZFull, weights=weights, k=k,
-              qp=gauss.quad(nQuad, "hermite"),
-              covariance_constructor=covarianceConstructor, verbose=verbose,
-              nlmevar=nrow(lmeVarDF)-1, nz=nz, acc=acc0, family=family)
-  # notes: BLUE finds the expected value of the likelihood surface
-  # it is not, properly, a BLUE
-  BLUE0 <- BLUE(groups=data[,all_groups,drop=FALSE], y=y, X=X, levels=levels,
-                Z=Z, ZFull=ZFull, weights=weights, k=k,
-                qp=gauss.quad(nQuad, "hermite"),
-                covariance_constructor=covarianceConstructor, verbose=verbose,
-                nlmevar=nrow(lmeVarDF)-1, nz=nz, acc=acc0, family=family)
+  q2 <- nrow(lmeVarDF[lmeVarDF$level == 2 & is.na(lmeVarDF$var2),])
+  q3 <- nrow(lmeVarDF[lmeVarDF$level == 3 & is.na(lmeVarDF$var2),])
+  q_tot <- q3*n_top + q2*n_l2
   
-  # form omega0
-  # omega0 is a list of matricies where each list element represents a level
-  # each matrix column represents the value of b for all units at the level 
-  bvec <- getME(lme, "b") #get b values from lme results
-  bvecCuts <- getME(lme, "Gp") #find out indices corresponding to different levels
-  blist <- vector("list", levels) # NULL for level 1
-  
-  #startLoc helps transform the z vector into a z matrix, starting from the beginning ( index of 1)
-  startLoc <- 1
-  
-  # number of rows that the Z matrix has at level (l-1), skipped 1 here
-  # this is used exclusively to form bmat
-  # the issue is that bvecCuts doesn't have cuts for factor levels
-  # the n_rows_z code fixes thatS
-  comps <- names(getME(lme,"cnms")) #has same n as bvec and tells you group and var
-  n_rows_z <- list()
-  for (i in 1:length(comps)){
-    n_rows_z[i] <- lmeVarDF[lmeVarDF$grp == comps[i],"ngrp"][1]
+  Z_mat <- getME(lme,"Z")
+  lambda <- as(Cholesky(Matrix(constructSigma(exp(est0[-(1:ncol(X))]),nRE,n_l2,n_top))),"sparseMatrix")
+  Whalf <- Diagonal(x = sqrt(1 / y))
+  mu_eta <- Whalf
+  PsiVec <- rep(weights[[2]]$w,each=q2)
+  if(levels == 3){
+    PsiVec <- c(PsiVec, rep(weights[[3]]$w,each=q3))
   }
-
-  #forming matrixes of b values 
-  blist <- vector("list", levels) # NULl for level 1
-  for(cuti in 2:length(bvecCuts)) {
-    bmat <- matrix(bvec[startLoc:bvecCuts[cuti]], nrow=n_rows_z[[cuti-1]])
-    li <- unique(lmeVarDF$level[lmeVarDF$ngrp==nrow(bmat)])
-    blist[[li]] <- cbind(blist[[li]], bmat)
-    startLoc <- bvecCuts[cuti] + 1
-  }
-  
-  omega0 <- blist
-
-  # make MAP estimate with b values and parameter estimates 
-  a0 <- MAP0(omega0=omega0, par0=est0)
-
-  # add determinant to scale z values
-  # created the adapted quadrature locaiton by moving original points based on curvature Q
-  # follows equation of Hartzel et al, pg 87 (Reference in main vignette)
-  zScale <- lapply(a0$Qi0, function(Qi0i) {
-                     if(is.null(Qi0i)) {
-                       return(NULL)
-                     }
-                     df <- data.frame(detQ=sapply(Qi0i,det))
-                     # add group labels
-                     for(i in 1:length(groupNames)) {
-                       if(length(unique(data[,groupNames[i]])) == nrow(df)) {
-                         df[,groupNames[i]] <- unique(data[,groupNames[i]])
-                         attr(df,"groups") <- c(attr(df, "groups"), groupNames[i])
-                       }  
-                     }
-                     df
-                   })
-    
-  index <- data.frame(data[,c(groupNames)])
-  names(index) <- groupNames
-  #add column with determinant of Q to the Z infomration (join by index which is group name)
-  for(wi in 2:length(weights)) {
-    Zgrps <- attr(zScale[[wi]], "groups")
-    weights[[wi]] <- merge(weights[[wi]],zScale[[wi]][,c(Zgrps, "detQ")],by.x="index", by.y=Zgrps)
-  }
-  
-  # first guess
-  est <- est0
-
-  # use lnl function to optimize
-  qp <- gauss.quad(nQuad,"hermite")
-  # the covariance constructor maps the variance terms that are less than 1
-  # to exp(x-1) to avoid negative variance terms.
-  # fn0 does not use this map and can be easily used by the user
-  # fn0R does use that map and is intended for use by the optimizer
-  # these calls are otherwise identical.
-  fn0 <- param.lnl.quad(y=y,
-                        X=X,
-                        levels=levels,
-                        Z=Z,
-                        ZFull=ZFull,
-                        Qi=a0$Qi,
-                        QiFull=a0$QiFull,
-                        omega=a0$omega,
-                        omegaFull=a0$omegaFull,
-                        W=weights,
-                        k=k,
-                        qp=qp,
-                        cConstructor=covarianceConstructor,
-                        acc0=acc0,
-                        mappedDefault=FALSE,
-                        family=family)
-  
-  fn0R <- param.lnl.quad(y=y,
-                         X=X,
-                         levels=levels,
-                         Z=Z,
-                         ZFull=ZFull,
-                         Qi=a0$Qi,
-                         QiFull=a0$QiFull,
-                         omega=a0$omega,
-                         omegaFull=a0$omegaFull,
-                         W=weights,
-                         k=k,
-                         qp=qp,
-                         cConstructor=covarianceConstructor,
-                         acc0=acc0,
-                         mappedDefault=TRUE, 
-                         family=family)
-
-  if(!run) {
-    # if run option is false the function terminates here, returning the components used in the optimization
-    # without performing the optimization
-    return(list(lnlf=fn0R, parlme=parlme, omega0=a0$omega0, lme=lme, adapt=a0, weights=weights))
-  }
+  Psi <- Diagonal(x=PsiVec)
   
   #############################################
   #     3) Maximum Likelihood estimation      #
   #############################################
   
-  d1 <- rep(Inf, length(est)) #d1 represent first derivatives of estimates 
-  oldlnl <- fn0(est, varFloor=-3.59) # evaluate the likelihood with the estimated coefficients before adaptive quadrature 
+  # this gets used in optimization
+  main_lnl <- main_lnl_container(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
+                                 l2_group_sizes,group_sizes,levels,weights,
+                                 weights_cond,nQuad,family)
   
-  a00 <- a0 # start from previous estimates (MAP estimates) 
-    
-  if(verbose) {
-    cat("Starting Newton steps.\n")
-  }
-  
-  #select just variances that are > -3 to aviod continued adaptation below 0 
-  covs_and_vars <- est[-(1:k)]
-  vars <- covs_and_vars[which(is.na(lmeVarDF$var2))]
-  not_0_vars <- which(vars>-3)+k
-  est[-(1:k)]  <- ifelse(est[-(1:k)]< -4.6,-4.6,est[-(1:k)])  #reset variance that get below threshold
-  # v is the full Newton step vector. Here set to a stub value
-  v <- d1
-
-  # Newton steps continue until step size is under threshold, excluding variances < -3
-  # the denominator prevents relative changes that are indistinguishable from 0 from being
-  # included.
-  skipNextHessian <- FALSE
-  # every step is of all parts, this works best.
-  # but leave this in here since we may later enounter a situation where it helps
-  defStepsInds <- list(1:length(est0))
-  stepIndQueue <- list()
-  dd1 <- d1
-  dd2 <- outer(dd1,dd1) 
+  # this gets returned to the user/used in summary methods
+  main_lnlR <- lnl_by_group(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
+                            l2_group_sizes,group_sizes,levels,weights,
+                            weights_cond,nQuad,family,parameterization = "var")
+  tol <- 1e-8
+  not_converged <- TRUE
   iteration <- 0
-  varFloorBinding <- FALSE
-  oldest <- est
+  est <- est0
+  vcov.tmp <- est[-(1:ncol(X))]
+  est <- c(est[1:ncol(X)],sqrt(abs(vcov.tmp)))
 
-  # first condition, a variance is 0.01, so we look just for fitted values to not change
-  # second condition, look for derivatives to be small
-  while(all(iteration < max_iteration,
-            any(varFloorBinding & max(est - oldest) > 1e-5 ,
-               !varFloorBinding & max(abs(dd1[c(1:k, not_0_vars)]/pmax(abs(est[c(1:k, not_0_vars)]), 1e-5))) > 1E-5)
-                               )) { 
-    iteration <- iteration + 1
-    oldest <- est
-    if(length(stepIndQueue)==0) {
-      stepIndQueue <- defStepsInds
-    }
-    thisStepInds <- stepIndQueue[[1]]
-    # calls helper function to get both first and second derivative 
-    d1 <- getGrad(fn0, est, thisStepInds)
-    # update full length grad
-    dd1[thisStepInds] <- d1
-    if(!skipNextHessian) {
-      d2 <- getHessian(fn0, est, thisStepInds)
-      # update full size Hessian
-      dd2[thisStepInds, thisStepInds] <- d2
-    }
-    # use most recent Hessian
-    d2 <- dd2[thisStepInds, thisStepInds]
-    fact <- 1 # scaling factor by which this step is multiplied 
-    v <- rep(0, length(est0))
-    v[thisStepInds] <- solve(d2) %*% d1 # the Newton step
-    if(verbose) {
-      cat("step:", iteration, "/", max_iteration, "\n")
-      cat("lnl:", oldlnl, " max (relative) derivative=", max(abs(dd1[c(1:k,not_0_vars)]/pmax(abs(est[c(1:k,not_0_vars)]), 1e-5))), " ")
-      cat("\nCurrent solution, gradient, and Newton step:\n")
-      prnt <- cbind(oldEstimate=est, firstDeriv=dd1, proposedNewtonEstimate=est - v)
-      rownames(prnt) <- c(names(est0)[1:k], paste0("ln var ", names(est0)[-(1:k)], ""))
-      colnames(prnt) <- c("previous Est", "firstDeriv", "Newton Step")
-      print(prnt)
-    }
+  while(iteration < max_iteration & not_converged){
+    step_size <- 1
     
-    # create new estimate by stepping in the direction idicated by gradient and scaled by fact
-    newest <- est - fact * v
-    newlnl <- fn0(newest, varFloor=-3.59)
-    stp <- 0
-    
-    # make sure Newton step is a step improves lnl
-    while(newlnl < oldlnl) {
-      stp <- stp + 1
-      if(verbose) {
-        cat("Halving step size.\n")
-      }
-      fact <- fact/2
-      if(stp > 5 & fact > 0) {
-        if(verbose) {
-          cat("Reversing step direction.\n")
-        }
-        ##reverse direction if more than 5 steps have been taken, avoid newtons method getting stuck 
-        fact <- -1
-        stp <- 0
-      }
-      if (stp>10) {
-        # bad search direction, do nothing
-        fact <- 0
-        oldlnl <- oldlnl - 1
-      }
-      newest <- est - fact * v
-      newlnl <- fn0(newest, varFloor=-3.59)      
-    } # end while(newlnl < oldlnl)
-    if(verbose) {
-      cat("\n")
-    }
-    # update current estimate with the step we decided on
-    est <- est - fact * v
-    # update the lnl
-    oldlnl <- newlnl
-
-    # now, worry about threshold
-    if(any(est[-(1:k)] < -3.59)) {
-      est[-(1:k)]  <- ifelse(est[-(1:k)] < -3.59, -3.59, est[-(1:k)])  #reset variance that get below threshold
-      varFloorBinding <- TRUE
-      # no need up update oldlnl, this varFloor is always enforced
-    }
-    #adapts new quadrature points if parameter keepAdapting is true  
-    if(keepAdapting) {
-      if(verbose) {
-        cat("Adapting random effect estimates.\n")
-      }
-      # adapter is never BLUE now
-      if(adapter == "BLUE") {
-        a0 <- BLUE0(omega0=a0$omega0, par0=est0, Qi0=a0$Qi0)
-      } else {
-        # update the b and Q parameters
-        a0 <- MAP0(omega0=a0$omega0,
-                   par0=est,
-                   verb=FALSE)
-      }
-      
-      #recacluate scaled Z values based on new Q (Curvature)
-      zScale <- lapply(a0$Qi0, function(Qi0i) {
-                   if(is.null(Qi0i)) {
-                     return(NULL)
-                   }
-                   df <- data.frame(detQ=sapply(Qi0i,det))
-                   # add group labels
-                   for(i in 1:length(groupNames)) {
-                     if(length(unique(data[,groupNames[i]])) == nrow(df)) {
-                       df[,groupNames[i]] <- unique(data[,groupNames[i]])
-                       attr(df,"groups") <- c(attr(df, "groups"), groupNames[i])
-                     }  
-                   }
-                   df
-                 })
-      
-      # move new values of detQ on to dataframes in weights list 
-      for(wi in 2:length(weights)) {
-        weights[[wi]]$detQ <- NULL
-        Zgrps <- attr(zScale[[wi]], "groups")
-        weights[[wi]] <- merge(weights[[wi]],zScale[[wi]][,c(Zgrps, "detQ")],by.x="index", by.y=Zgrps)
-      }
-
-      # update function for unser and function for optimization
-      fn0 <- param.lnl.quad(y=y,
-                            X=X,
-                            levels=levels,
-                            Z=Z,
-                            ZFull=ZFull,
-                            Qi=a0$Qi,
-                            QiFull=a0$QiFull,
-                            omega=a0$omega,
-                            omegaFull=a0$omegaFull,
-                            W=weights,
-                            k=k,
-                            qp=qp,
-                            cConstructor=covarianceConstructor,
-                            acc0=acc0,
-                            mappedDefault=FALSE,
-                            family=family)
-      
-      fn0R <- param.lnl.quad(y=y,
-                             X=X,
-                             levels=levels,
-                             Z=Z,
-                             ZFull=ZFull,
-                             Qi=a0$Qi,
-                             QiFull=a0$QiFull,
-                             omega=a0$omega,
-                             omegaFull=a0$omegaFull,
-                             W=weights,
-                             k=k,
-                             qp=qp,
-                             cConstructor=covarianceConstructor,
-                             acc0=acc0,
-                             mappedDefault=TRUE,
-                             family=family)
-      
-      # Process of adapting stops when there the relative difference between chosen points is below threshold 
-      if(max(abs(a00$omega0[[2]] - a0$omega0[[2]])/pmax(abs(a0$omega0[[2]]),1E-10)) < 1E-2) {
-        if(verbose) {
-          cat("Done adapting; the mode is not changing sufficiently.\n")
-        }
-        keepAdapting <- FALSE
-      }
-      if(keepAdapting & max(abs(d1)) <= 1E-3) {
-        if(verbose) {
-          cat("Done adapting: close to a solution.\n")
-        }
-        keepAdapting <- FALSE
-      }
-      a00 <- a0
-      # the lnl function may have shifted enough that we need to update the current lnl
-      # so update it based on these new quad points
-      oldlnl <- fn0(est, varFloor=-3.59)
-    } # end if(keepAdapting)
-    #end of the Newton's method while loop
-    
-    #re updates the index of vars that are greater than -3 based on new est values 
-    covs_and_vars <- est[-(1:k)]
-    vars <- covs_and_vars[which(is.na(lmeVarDF$var2))] #select only vars not covars 
-    not_0_vars <- which(vars > -3) + k
-    if((!skipNextHessian & max(sum(abs(fact*v)/abs(est))) < (.Machine$double.eps)^0.25) & max(abs(dd2)) < Inf) {
-      skipNextHessian <- TRUE
+    if(iteration == 0){
+      gradhess <- getGradHess(func=main_lnl, x=est)
     } else {
-      skipNextHessian <- FALSE
+      gradhess <- gradhess_new
     }
-  } # end of while(max(abs(d1/pmax(abs(est),1e-5))) > 1E-5)
+    grad <- gradhess$grad
+    hess <- -1 * gradhess$hess
+    
+    # if hessian isn't PD, transform it to be
+    inc <- pt_inverse(hess)%*%grad
+    
+    going <- TRUE
+    while(going & main_lnl(est) >
+          main_lnl(est + step_size*inc)){
+      step_size <- step_size * 0.5
+      if(abs(step_size) < 0.001){
+        if(step_size < 0) {
+          going <- FALSE
+        } else {
+          step_size <- -1
+        }
+      }
+    }
+    
+    est <- est + step_size*inc
+    
+    gradhess_new <- getGradHess(func=main_lnl, x=est)
+    g <- gradhess_new$grad
+    
+    if(max(pmin(abs(est*g), abs(g))) < tol){
+      not_converged <- FALSE
+    }
+    
+    iteration <- iteration + 1
+  }
+
+  lambda <- updateLambda(lambda,est[-(1:ncol(X))],q2,q3,n_l2,n_top)
+  Sigma <- lambda%*%Matrix::t(lambda)
+  
   if(verbose) {
-    message("Itterations complete.")
+    message("Iterations complete.")
   }
   if (iteration >= max_iteration){
     #warning("Model exceeded maximum number of iterations and may not have converged.")
@@ -967,25 +724,44 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #############################################
   #            4) Post Estimation             #
   #############################################
- 
-  hessian <- dd2
   
-  # For each "random effect" calculate the maximum of the likelihood surface (MAP)
-  # and the expected value of the likelihood surface (BLUE)
-  MAP <- MAP0(omega0=a0$omega0, par0=est, verb=FALSE)$omega0
-  BLUE <- BLUE0(omega0=a0$omega0, par0=est, Qi0=a0$Qi0, adapt=FALSE, verb=FALSE)
+  # need to add this
+  tmp <- pirls_u(y,X,Z_mat,lambda,u=rep(0,length(PsiVec)),beta=est[1:ncol(X)],Whalf,mu_eta,
+                 family,w1=weights[[1]]$w,PsiVec,Psi,l2_group_sizes,group_sizes,n_l2,n_top,
+                 levels,q2,q3,by_group=FALSE)
+  u_vector <- tmp$modes
   
   # make est numeric
-  est <- as.numeric(est)
-  
+  est.chol <- as.numeric(est)
+  order <- vector(mode="numeric")
+  if(q2==1){
+    order <- c(1)
+  }else{
+    order <- c(1,3,2)
+  }
+  if(levels==3){
+    if(q3 == 1){
+      order <- c(order,max(order)+1)
+    }else{
+      order <- c(order,max(order)+1,max(order)+3,max(order)+2)
+    } 
+  }
+  est[-(1:k)] <- unique(Sigma@x)[order]
   # make sure the names agree with lmer
   names(est) <- names(parlme)
   
+  lnl_final <- main_lnl(est.chol)
+  
+  main_lnl <- main_lnl_container(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
+                                 l2_group_sizes,group_sizes,levels,weights,
+                                 weights_cond,nQuad,family,parameterization = "var")
+
+  hessian <- getHessian(main_lnl,est)
   # fix vars that are less than one to be mapped
   covs_and_vars <- est[-(1:k)]
   vars <- covs_and_vars[which(is.na(lmeVarDF$var2))] #select only vars not covars 
   need_fix_vars <- which(vars < 1)
-  covs_and_vars[need_fix_vars] <- exp(covs_and_vars[need_fix_vars] - 1)
+  #covs_and_vars[need_fix_vars] <- exp(covs_and_vars[need_fix_vars] - 1)
   
   # get vars and name them
   vars <- covs_and_vars
@@ -998,7 +774,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
                    " Very low variance suggests that the data is not hierarchical and that a model without these levels should be considered.",
                    " If this removes all groups then a non-hierarchical model, such as logistic regression, should be considered."))
     # calculate hessian, moving covariances to just larger values so the Hessian is internal
-    hessian <- getHessian(fn0R, c(est[1:k], covs_and_vars+0.0002*need_fix_vars))
+    hessian <- getGradHess(main_lnl, c(est[1:k], covs_and_vars+0.0002*need_fix_vars))$hess
   }
 
   #calculate interclass corelation (ICC) 
@@ -1006,7 +782,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   var_within <- vars[which(lmeVarDF$grp=="Residual")]
   ICC <- var_between/(var_between+var_within)
   
-  # it is possible for the lnl to have changed slightly, so update it to avoid confusion
   nobs <- nrow(X)
   names(nobs) <- "Number of obs"
   ngroups <- c(nobs, ngrp)
@@ -1017,10 +792,10 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   varDF$vcov <- 0
   varDF$fullGroup <- paste0(varDF$grp,ifelse(!is.na(varDF$var1),paste0(".",varDF$var1),""))
   
-  varDF$vcov <- vars #re assign in variance from mix.  This works without formatting because only 2 level models are posisble
+  varDF$vcov <- vars #re assign in variance from mix.
   
-  res <- list(lnlf=fn0R, lnl=fn0(est, varFloor=-3.59), coef=est[1:k], vars=vars,
-              call=call, levels=levels, ICC=ICC, CMODE=BLUE,
+  res <- list(lnlf=main_lnlR, lnl=lnl_final, coef=est[1:k], vars=vars,
+              call=call, levels=levels, ICC=ICC, CMODE=u_vector,
               invHessian=hessian, is_adaptive=TRUE, ngroups=ngroups, varDF=varDF,
               wgtStats=ngrpW)
   class(res) <- "WeMixResults"
@@ -1028,411 +803,441 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
 }
 
 
-# finds expected value of the "random effects" likelihood surfaces
-# this function cannot find these without input estimates; it cannot be used for adapting.
-# @author Paul Bailey
-BLUE <- function(groups, y, X, levels, Z, ZFull, weights0, k, qp,
-                 covariance_constructor, verbose, nlmevar, nz, acc,
-                 family) {
-
-  # must define one of Qi or Qi0. Defining Qi is faster
-  #this is the function that is returned when BLUE is called 
-  function(omega0, par0, Qi=NULL, Qi0=NULL, verb=verbose, adapt=TRUE) {
-    
-    # form the Q matrixes from weights
-    weights <- weights0 #start with original weights 
-    if(is.null(Qi)) {
-      Qi <- list(NULL)
-      QiFull <- list(NULL)
-      for( oi in 2:length(omega0)) {
-        map <- groups[,oi-1] # decrement index by one because the first groups data frame doesnt have a column for level 1
-        umap <- unique(map)
-        nzi <- ncol(Z[[oi]]) # find number of z variables at this level 
-        Qi[[oi]] <- matrix(0, nrow=nzi, ncol=nzi*nrow(weights[[oi-1]]))
-        for(i in 1:nrow(weights[[oi-1]])) {
-           #shape Qi, a list with one element per model level
-          #each element of Qi has one row for each random effect (Z) and one column for each observation in the level below-random effect combination
-          #values are being moved over from Qi0 which is the MAP estimates at the group level
-          Qi[[oi]][1:nzi,(i-1)*nzi+1:nzi] <- Qi0[[oi]][[(1:length(umap))[map[i]==umap] ]]
-        }
-        QiFull[[oi]] <- matrix(0, nrow=nzi, ncol=nzi*nrow(X))
-        for(i in 1:nrow(X)) {
-          #Also  full version which as one row for each Z and one column for each obs-random effect combination
-          QiFull[[oi]][1:nzi,(i-1)*nzi+1:nzi] <- Qi0[[oi]][[(1:length(umap))[map[i]==umap] ]]
-        }
-      } # ends  for( oi in 2:length(omega0))
-    } # ends if(is.null(Qi)
-
-    # function that creates dataframe to be used to scale Z value by the scaling factor calculated as the determinate of the curvature Q
-    zScale <- lapply(Qi0, function(Qi0i) {
-                 if(is.null(Qi0i)) {
-                   return(NULL)
-                 }
-                 df <- data.frame(detQ=sapply(Qi0i,det))
-                 # add group labels 
-                 for(i in 1:ncol(groups)) {
-                   if(length(unique(groups[,i])) == nrow(df)) {
-                     df[,colnames(groups)[i]] <- unique(groups[,i])
-                     attr(df,"groups") <- c(attr(df, "groups"), colnames(groups)[i])
-                   }
-                 }
-                 df
-               })
-
-    # for  each data frame in weightes merger on the scaling factor determinat of
-    # curvature (detQ)
-    for(wi in 2:length(weights)) {
-      weights[[wi]]$detQ <- NULL
-      Zgrps <- attr(zScale[[wi]], "groups")
-      weights[[wi]] <- merge(weights[[wi]], zScale[[wi]][,c(Zgrps, "detQ")],by.x="index", by.y=Zgrps)
-    }
-     
-    # make new omega
-    omega <- buildOmega(omega0=omega0, groups=groups, nrowX=nrow(X))
-    omegaFull <- buildOmega(omega0=omega0, groups=groups, nrowX=nrow(X), full=TRUE)
-    # make stubs
-    Qi0_ <- list(NULL)
-    Qi_ <- list(NULL)
-    tmpomega <- list(NULL)
-    for( oi in 2:length(omega0)) {
-      omg0 <- omega0[[oi]]
-      omg1 <- 2*omg0  #increment up to allow while loop to run
-       
-      # keep looking for the mean
-      while( max(abs( (omg1 - omg0) / pmax(abs(omg0), 1E-5))) > 1E-3) {
-        omg1 <- omg0
-        tmpomega_ <- c(tmpomega, list(omg0))
-        nzi <- ncol(Z[[oi]]) # number of Z columns at olvl
-        f <- param.lnl.quad(y, X, oi, Z, ZFull=ZFull, Qi=Qi, QiFull=QiFull,
-                            omega, omegaFull=omegaFull, W=weights, k, qp,
-                            covariance_constructor, bobyqa=FALSE, verbose=TRUE, acc0=acc,
-                            mappedDefault=FALSE, family=family)
-        for(ici in 1:ncol(omg0)) {
-          f0 <- f(par0, top=FALSE, integralMultiplierExponent=0, integralZColumn=ici)
-          f1 <- f(par0, top=FALSE, integralMultiplierExponent=1, integralZColumn=ici)
-          # f1 is not logged, f0 is
-          omg0[ , ici] <- as.numeric(f1/f0)
-        }
-        # make omega
-        omega0p <- c(tmpomega, list(omg0))
-        while( length(omega0p) < length(omega0)) {
-          omega0p[[length(omega0p)+1]] <- omega0[[length(omega0p)+1]] 
-        }
-        omega <- buildOmega(omega0=omega0p, groups=groups, nrowX=nrow(X))
-        omegaFull <- buildOmega(omega0=omega0p, groups=groups, nrowX=nrow(X), full=TRUE)
-        if(!adapt) {
-          # no need to loop, this is the BLUE
-          omg1 <- omg0
-        }
-      }
-      if(verb & adapt) {
-        cat("BLUE estimates:\n")
-        print(omg0)
-      }
-      # move the integration points to the new BLUE estiamtes and update
-      if(adapt) {
-        omg0Full <- buildOmega(omega0=tmpomega_, groups=groups, nrowX=nrow(X), full=TRUE)
-        derivatives <- genD(adapterLnL(y, X, levels, Z, ZFull, weights, k, qp,
-                                       covariance_constructor, omega,
-                                       omg0Full,
-                                       tmpomega_, par0, verb, Qi, QiFull, oi,
-                                       acc, family),
-                            rep(0,sum(unlist(nz)[1:oi], na.rm=TRUE)))
-        d2 <- derivatives$D[,-(1:nzi),drop=FALSE] # remove first derivatives
-        drv <- d2
-        # assumes there are exactly two levels
-        Qi0_[[oi]] <- lapply(1:nrow(drv), function(i) { 
-          scaleQuadPoints(drv[i,], nzi)
-        })
-        map <- groups[,oi-1]
-        umap <- unique(map)
-        Qi_[[oi]] <- matrix(0, nrow=nzi, ncol=nzi*nrow(X))
-        for(i in 1:nrow(X)) {
-          Qi_[[oi]][1:nzi,(i-1)*nzi+1:nzi] <- Qi0_[[oi]][[(1:length(umap))[map[i]==umap] ]]
-        } 
-        QiFull[[oi]] <- matrix(0, nrow=nzi, ncol=nzi*nrow(X))
-        for(i in 1:nrow(X)) {
-          QiFull[[oi]][1:nz,(i-1)*nz+1:nz] <- Qi0[[oi]][[(1:length(umap))[map[i]==umap] ]]
-        }
-      }
-      # now, actually add this to the tmpomega
-      tmpomega <- c(tmpomega, list(omg0))
-      omg0Full <- buildOmega(omega0=tmpomega, groups=groups, nrowX=nrow(X), full=TRUE)
-    }
-    if(adapt) {
-      return(list(omega0=tmpomega, omega=omega, omegaFull=omg0Full, Qi0=Qi0_, Qi=Qi_, QiFull=QiFull))
-    } else {
-      return(tmpomega)
-    }
-  }
-}
-
-
-# finds the maximum of the likelihood surface and (approximate) SD, per "random effect"
-# this function can find these without input estimates. This is used for adapting
-MAP <- function(groups, y, X, levels, Z, ZFull, weights, k, qp,
-                covariance_constructor, verbose, nlmevar, nz, acc, family) {
-  ####################################################
-  #                        Outline:                  #   
-  #        1) Find points for MAP estimation         #
-  #        2) MAP estimate                           #
-  #         3) Estimate variance                     #
-  ####################################################
+pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
+                    l2_group_sizes,group_sizes,n_l2,n_top,levels,q2,q3,by_group=FALSE){
   
-  # when you call adapter, it returns this function that can be called with omega0 and par0
-  # and will find a new MAP and SD for each RE
-  function(omega0, par0, verb=verbose) {
-    #####################################################
-    #        1) Find points for MAP estimation         #
-    #####################################################
-    
-    # make omega, which is omega0 at the level one  data length
-    omega <- buildOmega(omega0=omega0, groups=groups, nrowX=nrow(X))
-    omegaFull <- buildOmega(omega0=omega0, groups=groups, nrowX=nrow(X), full=TRUE)
-   
-    # f returns the log(likelihood * posterior), per group
-    # use Newton's method, per group, to find the maximum of the a posterori surface
-    Qi0 <- list(NULL)
-    Qi <- list(NULL)
-    QiFull <- list(NULL)
-    tmpomega <- list(NULL)
-    tmpomegaFull <- list(NULL)
-    u0 <- 0
-    for(oi in 2:length(omega0)) {
-      # Over all levels >1 
-      omg0 <- omega0[[oi]]
-      omg1 <- 1E20*(omg0+1E-15)
-      nzi <- nz[[oi]]
-      iter <- 0
-      while( iter < 25 & max(abs( (omg1 - omg0) / pmax(abs(omg0), 1E-5))) > 1E-3) { # iterate while Omega continues to change more than threshold
-        if(iter >= 1) {
-          u0 <- max(c(u0, as.vector(abs( (omg1 - omg0) ))))
-        }
-        iter <- iter + 1
-        omg1 <- omg0
-        tmpomega_ <- c(tmpomega, list(omg0))
-        toF <- buildOmega(omega0=tmpomega_, groups=groups, nrowX=nrow(X), full=TRUE)
-        ofn <- adapterLnL(y, X, levels, Z, ZFull, weights, k, qp,
-                          covariance_constructor, omega, toF,
-                          tmpomega_, par0, verb, Qi, QiFull, oi, acc,
-                          family)
-        # this is just second derivatives
-        d1 <- getJacobian(ofn, rep(0, nz[[oi]], na.rm=TRUE), m=nrow(omg0))
-        d2 <- getHessian(ofn, rep(0, nz[[oi]], na.rm=TRUE))
-        
-        ######################################
-        #        2) MAP estimate            #
-        ######################################
-        
-        # this is the Newton step, per group
-        omg0 <- lapply(1:length(d2),
-                       function(i) {
-                         step <- solve(d2[[i]]) %*% d1[[i]]
-                         if(iter >= 3) {
-                           # first, nudge down to 1/2 step for everything
-                           step <- 1/2 * step
-                           # contract to no larger than the initial step
-                           # slowly moving that max down as iteration number increases
-                           ii <- 1
-                           while(any(abs(step) > 3*u0/iter)) {
-                             ii <- ii + 1
-                             step <- 1/2 * step
-                             if(ii > 20) {
-                              stop("Ridiculous Newton step proposed, MAP not converging.")
-                             }
-                           }
-                         } else {
-                           # contract just a bit
-                           step <- 1/2 * step
-                         }
-                         omg0[i,] - step
-                       })
-        
-        # this recudes that to a vector
-        omg0 <- t(do.call(cbind, omg0))
-        # make omega
-        omega0p <- c(tmpomega, list(omg0))
-        while( length(omega0p) < length(omega0)) {
-          omega0p[[length(omega0p)+1]] <- omega0[[length(omega0p)+1]] 
-        }
-        omega <- buildOmega(omega0=omega0p, groups=groups, nrowX=nrow(X))
-        omegaFull <- buildOmega(omega0=omega0p, groups=groups, nrowX=nrow(X), full=TRUE)
-        
-      } # end while( max(abs( (omg1 - omg0) / pmax(abs(omg0),1E-5))) > 1E-3)
-      if(verb) {
-        cat("Estimates:\n")
-        print(omg0)
-      }
-      #####################################################
-      #         3) Estimate variance (Fishers I)          #
-      #####################################################
+  useCholUpdate <- FALSE
+  pirls <- TRUE
+  iter <- 0
+  Xb <- as.vector(X%*%beta)
+  LtZt <- Matrix::t(lambda)%*%Matrix::t(Z_mat)
+  u <- u*1
+  u0 <- u
+  eta <- Xb + as.vector(Matrix::crossprod(LtZt, u))
+  mu <- family$linkinv(eta)
+  
+  L <- Cholesky(Matrix(Matrix::tcrossprod(LtZt)), perm=FALSE, LDL=FALSE, Imult=1)
+  updatemu <- function(uu) {
+    eta[] <<- as.numeric(Xb + as.vector(Matrix::crossprod(LtZt, uu)))
+    mu[] <<- family$linkinv(eta)
+    sum(family$dev.resids(y, mu, wt=w1)) + sum(PsiVec*uu^2)
+  }
 
-      # add this to the tmpomega
-      tmpomega <- c(tmpomega, list(omg0))
-      tmpomegaFull <- omegaFull
-      # get Qi
-      drv <- d2
-      # assumes there are exactly two levels
-      Qi0[[oi]] <- lapply(1:length(drv), function(i) {
-        ss <- scaleQuadPoints(drv[[i]], nzi)
-        for(j in 1:nrow(ss)) {
-          if(ss[j,j] > abs(omg0[i,j])) {
-            ss[j,j] <- sqrt(ss[j,j]^2 + omg0[i,j]^2)
-            omg0[i,j] <<- 0
-          }
-        }
-        ss
-      })
-      map <- groups[,oi-1]
-      umap <- unique(map)
-      nzi <- ncol(Z[[oi]]) # number of Z columns at olvl
-      Qi[[oi]] <- matrix(0, nrow=nzi, ncol=nzi*nrow(weights[[oi-1]]))
-      for(i in 1:nrow(weights[[oi-1]])) {
-        Qi[[oi]][1:nzi,(i-1)*nzi+1:nzi] <- Qi0[[oi]][[(1:length(umap))[map[i]==umap] ]]
-      }
-      QiFull[[oi]] <- matrix(0, nrow=nzi, ncol=nzi*nrow(X))
-      for(i in 1:nrow(X)) {
-        QiFull[[oi]][1:nzi,(i-1)*nzi+1:nzi] <- Qi0[[oi]][[(1:length(umap))[map[i]==umap] ]]
-      }
-      # add to weights for further MAP calculations only
-      if(oi < length(omega0)) {
-        # add detQ
-        df <- data.frame(detQ=sapply(Qi0[[oi]],det))
-        # add group labels
-        groupNames <- colnames(groups)[oi-1]
-        for(i in 1:length(groupNames)) {
-          df[,groupNames[i]] <- unique(groups[,groupNames[i]])
-        }
-        # add detQ to weights for later iterations to use
-        weights[[oi]] <- merge(weights[[oi]],df[,c(groupNames, "detQ")],by.x="index", by.y=groupNames)
-      }
-    } # ends for( oi in 2:length(omega0))
+  olducden <- updatemu(u*0)
+  
+  while(pirls & iter <= 500){
+    mu_eta@x <- family$mu.eta(eta)
+    Whalf@x <- sqrt(w1 / (family$variance(mu)))
+    # update weighted design matrix - this is U
+    LtZtMWhalf <- as(LtZt%*%(mu_eta*diag(Whalf)),"sparseMatrix")
     
-    list(omega0=tmpomega, omega=omega, omegaFull=tmpomegaFull, Qi0=Qi0, Qi=Qi, QiFull=QiFull)
+    # update Cholesky decomposition - if fitting unweighted model,
+    # we can use the more efficient update function
+
+    if(useCholUpdate){
+      L <- update(L, LtZtMWhalf, 1) 
+    }else{
+      L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
+    }
+    # update weighted residuals
+    wtres <- diag(Whalf)*(y - mu)
+    
+    # solve for the increment
+    delu <- as.vector(Matrix::solve(L, LtZtMWhalf%*%wtres - Psi%*%u))
+    step_size <- 1
+    if(iter == 0){
+      # the first step can be overly large
+      # if it remains a good idea, the second step can always take it
+      step_size <- 0.01
+    }
+    
+    ucden <- updatemu(u + delu)
+    
+    while(step_size > 0.001 && ucden > olducden){
+      step_size <- step_size/2
+      ucden <- updatemu(u + step_size*delu)
+    }
+    
+    if(abs((olducden - ucden) / ucden) < 1e-8){
+      pirls <- FALSE
+    }
+    
+    olducden <- ucden
+    u <- u + step_size*delu
+    iter <- iter + 1
+  }
+
+  ucden <- updatemu(u)
+  Whalf@x <- sqrt(w1 / family$variance(mu))
+  mu_eta@x <- family$mu.eta(eta)
+  LtZtMWhalf <- as(LtZt%*%(mu_eta*diag(Whalf)),"sparseMatrix")
+  # update Cholesky decomposition
+  if(useCholUpdate){
+    L <- update(L,LtZtMWhalf,1)
+  }else{
+    L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
+  }
+  L <- as(L,"sparseMatrix")
+
+  llh <- -0.5*family$aic(y,rep.int(1,length(y)),mu,wt=w1,dev=NULL) - 0.5*sum(PsiVec*u^2) - 
+    Matrix::determinant((L/sqrt(PsiVec))^PsiVec)$modulus
+  
+  det_by_group <- NULL
+  # new args i need to add: l2_group_sizes,group_sizes,n_l2,n_top,levels
+  if(by_group){
+
+    llh <- llh_l2 <- l2_group_L <- l3_group_L <- vector(mode="numeric")
+    log_y_u <- rowsum(family$lnl(y,mu,w1,sd=NULL),rep(1:n_l2,l2_group_sizes))
+
+    for(i in 1:n_l2){
+      group_Psi <- PsiVec[((i-1)*q2 + 1):(i*q2)]
+      l2_group_L[i] <- Matrix::determinant(Matrix((L[((i-1)*q2 + 1):(i*q2),((i-1)*q2 + 1):(i*q2)]/sqrt(group_Psi))^group_Psi))$modulus
+      group_u <- u[((i-1)*q2 + 1):(i*q2)]
+      llh_l2[i] = log_y_u[i] - 0.5*sum(group_Psi*group_u^2) 
+    }
+    
+    if(levels == 2){
+      llh <- llh_l2 - l2_group_L
+      det_by_group <- l2_group_L
+    }else{
+      l3_Psi <- PsiVec[((q2*n_l2)+1):length(PsiVec)]
+      l2_Psi <- PsiVec[1:(q2*n_l2)]
+      llh_tmp <- rowsum(llh_l2,rep(1:n_top,group_sizes))
+      l3_u <- u[((q2*n_l2)+1):length(u)]
+      l2_L <- L[1:(n_l2*q2),1:(n_l2*q2)]
+      l3_L <- L[((n_l2*q2)+1):nrow(L),((n_l2*q2)+1):nrow(L)]
+      l2_l3_L <- L[((n_l2*q2)+1):nrow(L),(1:n_l2*q2)]
+
+      for(n in 1:n_top){
+        l3_comp <- l3_L[((n-1)*q3 + 1):(n*q3),((n-1)*q3 + 1):(n*q3)]
+        l2_comp <- l2_L[l2_l3_L[n,]!=0,l2_l3_L[n,]!=0]
+        l2_l3_comp <- l2_l3_L[n,][l2_l3_L[n,]!=0]
+        col.tmp <- matrix(0,ncol=q3,nrow=group_sizes[n])
+        group_L <- Matrix(cbind(rbind(l2_comp,l2_l3_comp),rbind(col.tmp,l3_comp)))
+        l3_group_Psi <- c(l2_Psi[l2_l3_L[n,]!=0],l3_Psi[((n-1)*q3 + 1):(n*q3)])
+        l3_group_L[n] <- Matrix::determinant((group_L/sqrt(l3_group_Psi))^l3_group_Psi)$modulus
+        l3_group_u <- l3_u[((n-1)*q3 + 1):(n*q3)]
+        llh[n] <- llh_tmp[n] - 0.5*sum(l3_Psi[((n-1)*q3 + 1):(n*q3)]*l3_group_u^2) - l3_group_L[n]
+        
+      }
+      det_by_group <- l3_group_L
+    }
+  }
+  
+  return(list(modes=u,hess=L,logLik=llh,det_by_group=det_by_group))
+}
+
+makeAdaptedPts <- function(muHat,R,nQuad,levels,q2,q3,n_l2,n_top){
+  
+  quadpts <- GHrule(nQuad)
+  
+  # extending univariate quadrature rule to dimension of random effects 
+  # at each level
+  # based on Pinheiro & Chao (2006) p. 71
+  l2_points <- t(as.matrix(expand.grid(lapply(seq_len(q2),function(k,u) u[,1], u = quadpts))))
+  l2_weights_tmp <- as.matrix(expand.grid(lapply(seq_len(q2),function(k,u) u[,2], u = quadpts)))
+  l2_weights <- exp(rowSums(t(l2_points)*t(l2_points))/2)*apply(l2_weights_tmp,1,prod)
+  
+  muHat2 <- Matrix(muHat[1:(n_l2*q2)])
+  
+  R_l2 <- R[(1:(n_l2*q2)),(1:(n_l2*q2))]
+
+  if(levels == 3){
+    l3_points <- t(as.matrix(expand.grid(lapply(seq_len(q3),function(k,u) u[,1], u = quadpts))))
+    l3_weights_tmp <- as.matrix(expand.grid(lapply(seq_len(q3),function(k,u) u[,2], u = quadpts)))
+    l3_weights <- exp(rowSums(t(l3_points)*t(l3_points))/2)*apply(l3_weights_tmp,1,prod)
+    muHat3 <- Matrix(muHat[(n_l2*q2+1):length(muHat)])
+    
+    R_l3 <- R[((n_l2*q2 +1):ncol(R)),((n_l2*q2 +1):ncol(R))]
+    R_l2_l3 <- R[(1:(n_l2*q2)),((n_l2*q2 +1):ncol(R))]
+    new_l3 <- Matrix::solve(R_l3,l3_points[rep(1:nrow(l3_points),times=n_top),]) + muHat3
+    new_l3_expanded <- new_l3[,rep(1:ncol(new_l3),each=nQuad^q2)]
+    
+    new_l2 <- Matrix::solve(R_l2)%*%(l2_points[rep(1:nrow(l2_points),times=n_l2),
+                                               rep(1:ncol(l2_points),times=nQuad^q3)] - 
+                                       (R_l2_l3%*%Matrix::solve(R_l3)%*%l3_points[rep(1:nrow(l3_points),each=n_top),
+                                                                                  rep(1:ncol(l3_points),each=nQuad^q2)])) + muHat2
+    combined <- rbind(new_l2,new_l3_expanded)
+    
+    output <- list(adapt_l2 = new_l2,adapt_l3=new_l3,adapt_comb=combined,
+                   l2_weights=l2_weights,l3_weights=l3_weights)
+    
+  }else{
+    new_l2 <- Matrix::solve(R_l2,l2_points[rep(1:nrow(l2_points),times=n_l2),]) + muHat2
+    combined <- new_l2
+    output <- list(adapt_l2 = new_l2,l2_weights=l2_weights,adapt_comb=combined)
+  }
+  
+  return(output)
+}
+
+constructSigma <- function(vcov,nRE,n_l2,n_top){
+  
+  mat_list <- list()
+  
+  # there will always be at least 2 levels
+  q2 <- nRE[[1]]
+  l2_var <- vcov[1:q2]
+  l2_mat <- Diagonal(x=l2_var)
+  l2_cov <- NULL
+  if(q2 > 1){
+    l2_cov <- vcov[(q2+1):(q2+choose(q2,2))]
+    l2_mat[row(l2_mat) < col(l2_mat)] <- l2_mat[row(l2_mat) > col(l2_mat)] <- l2_cov
+  }
+
+  if(length(nRE) == 1){
+    mat_list <- replicate(n_l2,l2_mat,simplify = FALSE)
+    group_sigma <- bdiag(mat_list)
+  }
+  
+  # for three levels, we need to create a block-diagonal matrix
+  if(length(nRE) > 1){
+    
+    vcov <- vcov[-(1:(length(l2_var)+length(l2_cov)))]
+    
+    q3 <- nRE[[2]]
+    l3_var <- vcov[1:q3]
+    l3_mat <- Diagonal(x=l3_var)
+    
+    if(q3 > 1){
+      l3_cov <- vcov[(q3+1):(q3+choose(q3,2))]
+      l3_mat[row(l3_mat) < col(l3_mat)] <- l3_mat[row(l3_mat) > col(l3_mat)] <- l3_cov
+    }
+
+    mat_list <- c(replicate(n_l2,l2_mat,simplify = FALSE),replicate(n_top,l3_mat,simplify = FALSE))
+    
+    group_sigma <- bdiag(mat_list)
+  }
+  
+  return(group_sigma)
+  
+}
+
+updateLambda <- function(lambda,vcov,q2,q3,n_l2,n_top){
+
+  if(q2 == 1){
+    l2_theta <- rep(vcov[1],n_l2)
+    if(length(vcov)>1){
+      vcov_l3 <- vcov[2:length(vcov)]
+    }
+  }else{
+    l2_theta <- rep(c(vcov[1],vcov[3],vcov[2]),n_l2)
+    if(length(vcov)>3){
+      vcov_l3 <- vcov[4:length(vcov)]
+    }
+  }
+  
+  if(q3 != 0){
+    if(q3 == 1){
+      l3_theta <- rep(vcov_l3[1],n_top)
+    }else{
+      l3_theta <- rep(c(vcov_l3[1],vcov_l3[3],vcov_l3[2]),n_top)
+    }
+    lambda@x <- c(l2_theta,l3_theta)
+  }else{
+    lambda@x <- l2_theta
+  }
+  
+  lambda
+}
+
+pt_inverse <- function(mat,m=1e-5){
+  e_dec <- eigen(mat)
+  lambda <- diag(e_dec$values)
+  Q <- e_dec$vectors
+  for(i in 1:ncol(lambda)){
+    if(abs(lambda[i,i]) >= m){
+      lambda[i,i] <- abs(lambda[i,i])
+    }else{
+      lambda[i,i] <- m
+    }
+  }
+  Q%*%solve(lambda)%*%t(Q)
+}
+
+main_lnl_container <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
+                               l2_group_sizes,group_sizes,levels,weights,weights_cond,
+                               nQuad,family,
+                               parameterization="cholesky") {
+  w1 <- weights[[1]]$w
+  w1c <- weights_cond[[1]]$w
+  w2 <- weights[[2]]$w
+  w2c <- weights_cond[[2]]$w
+  PsiVec <- rep(weights[[2]]$w,each=q2)
+  if(levels == 3){
+    PsiVec <- c(PsiVec, rep(weights[[3]]$w,each=q3))
+  }
+  Psi <- Diagonal(x=PsiVec)
+  q_tot <- q3*n_top + q2*n_l2
+  if(levels == 2){
+    nRE <- list(q2)
+  }else{
+    nRE <- list(q2,q3)
+  }
+  old_u <- rep(0,q_tot)
+  function(thetabeta){
+    beta <- thetabeta[1:ncol(X)]
+    vcov <- thetabeta[-(1:ncol(X))]
+    if(parameterization != "cholesky"){
+      sigma_mat <- as(nearPD(Matrix(constructSigma(vcov,nRE,n_l2,n_top)))$mat,"sparseMatrix")
+      lambda <- as(Cholesky(sigma_mat),"sparseMatrix")
+    }else{
+      lambda <- updateLambda(lambda,vcov,q2,q3,n_l2,n_top)
+    }
+
+    postModeVar <- pirls_u(y,X,Z_mat,lambda,u=old_u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
+                           l2_group_sizes,group_sizes,n_l2,n_top,levels,q2,q3,by_group=FALSE)
+    #old_u <<- 
+    muHat <- postModeVar$modes
+    
+    L <- postModeVar$hess
+    R <- Matrix::t(as(L,"sparseMatrix"))
+    
+    if(nQuad == 1){
+      llh <- postModeVar$logLik
+    } else {
+      # get the adapted quadrature locations for levels 2 and 3
+      adapted_points <- makeAdaptedPts(muHat,R/sqrt(PsiVec),nQuad,levels,q2,q3,n_l2,n_top)
+      new_l2 <- adapted_points$adapt_l2
+      l2_weights <- adapted_points$l2_weights
+      Z_lambda <- Z_mat%*%lambda
+      
+      combined <- adapted_points$adapt_comb
+      eta <- as.matrix(as.vector(X%*%beta) + Z_lambda%*%combined)
+      mu <- family$linkinv(eta)
+      
+      # Don't do all the weighting here - do it once the point values have been
+      # summed. Only weighting that should be done here is applying conditional
+      # level 1 weights. 
+      glm_llh <- family$lnl(y,mu,w1c,sd=NULL)
+      norm_llh_l2 <- -0.5*rowsum(as.matrix(new_l2^2),group=rep(1:n_l2,each=q2))
+      llh_l2_point <- rowsum(glm_llh,group=rep(1:n_l2,times=l2_group_sizes)) + norm_llh_l2
+      
+      # TO-DO: figure out more elegant way to do this - idea is summing up the point
+      # values within a single level 3 group (i.e. sum up the 'l' level 2 points at
+      # level 3 point 'k')
+      
+      if(levels == 3){
+        w3 <- weights[[3]]$w
+        new_l3 <- adapted_points$adapt_l3
+        l3_weights <- adapted_points$l3_weights
+        
+        llh_l2_inner_sum <- vector()
+
+        for(i in 1:nQuad^q3){
+          llh_l2_inner_sum <- cbind(llh_l2_inner_sum, 
+                                    rowLogSumExps(llh_l2_point[,((i-1)*(nQuad^q2) + 1):((nQuad^q2)*i)] + 
+                                                    rep(log(l2_weights),each=n_l2)))
+        }
+
+        norm_llh_l3 <- -0.5*rowsum(as.matrix(new_l3^2),group=rep(1:n_top,each=q3))
+        llh_l3_point <- rowsum(w2c*llh_l2_inner_sum,
+                               group=rep(1:n_top,times=group_sizes)) + norm_llh_l3
+        
+        llh_l3 <- w3*rowLogSumExps(llh_l3_point + rep(log(l3_weights),each=n_top))
+        
+        llh <- sum(llh_l3) - Matrix::determinant((R/sqrt(PsiVec))^PsiVec)$modulus
+      }else{
+        l2_weight_mat <- matrix(rep(log(l2_weights),each=n_l2),nrow=n_l2)
+        llh_l2 <- w2c*rowLogSumExps(llh_l2_point + l2_weight_mat)
+
+        llh <- sum(llh_l2) - Matrix::determinant((R/sqrt(PsiVec))^PsiVec)$modulus
+      }
+      
+    }
+    llh
   }
 }
 
-
-# helper functions for adapter:
-
-# turn the genD output into the Cholesky of the inverse Fisher information
-#' @importFrom Matrix nearPD
-scaleQuadPoints <- function(d2, nz){
-  solved <- solve(-1*d2)
-  res <- NULL
-  tryCatch(res <- chol(solved),
-           error= function(e) {
-             # if solved matrix is not positive definite (PD), use nearPD
-             # to find the nearest positive definite matrix.
-             # If that fails, because matrix is near negative semi-definite, use
-             # the absolute value of the diagonal as an approximation
-             tryCatch(solved <- nearPD(solved)$mat,
-                      error=function(e){
-                        solved <<- diag(abs(diag(solved)))
-                      })
-             res <<- chol(solved)
-           })
-  res
-}
-
-# turn omega0 (which has the same number of rows as there are units at each level
-# into omega (which has the same number of rows as the X data) 
-buildOmega <- function(omega0, groups, nrowX, full=FALSE) {
-  omega <- list(NULL)
-  oind <- 1
-  for(o0i in 2:length(omega0)) {
-    omega0i <- as.matrix(omega0[[o0i]])
-    res <- matrix(0, nrow=nrowX, ncol=ncol(omega0i))
-    noind <- ncol(omega0i) # number of columns to copy over
-    map <- groups[,o0i-1]
-    umap <- unique(map)
-    for(i in 1:length(umap)) {
-      # for each unique level
-      for(oindi in 1:noind) {
-        # copy over data by column (oindi) on omega0i
-        # effectively duplicated each value of omega0  a number of times coresponding to how many obs there are in that group
-        res[which(map==umap[i]),oindi] <- omega0i[i,oindi]
-      }
+lnl_by_group <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
+                         l2_group_sizes,group_sizes,levels,weights,weights_cond,
+                         nQuad,family,
+                         parameterization="cholesky") {
+  w1 <- weights[[1]]$w
+  w1c <- weights_cond[[1]]$w
+  w2 <- weights[[2]]$w
+  w2c <- weights_cond[[2]]$w
+  PsiVec <- rep(weights[[2]]$w,each=q2)
+  if(levels == 3){
+    PsiVec <- c(PsiVec, rep(weights[[3]]$w,each=q3))
+  }
+  Psi <- Diagonal(x=PsiVec)
+  q_tot <- q3*n_top + q2*n_l2
+  if(levels == 2){
+    nRE <- list(q2)
+  }else{
+    nRE <- list(q2,q3)
+  }
+  old_u <- rep(0,q_tot)
+  function(thetabeta,top=TRUE){
+    beta <- thetabeta[1:ncol(X)]
+    vcov <- thetabeta[-(1:ncol(X))]
+    if(parameterization != "cholesky"){
+      sigma_mat <- as(nearPD(Matrix(constructSigma(vcov,nRE,n_l2,n_top)))$mat,"sparseMatrix")
+      lambda <- as(Cholesky(sigma_mat),"sparseMatrix")
+    }else{
+      lambda <- updateLambda(lambda,vcov,q2,q3,n_l2,n_top)
     }
-    if(o0i > 2 & !full) {
-      res <- res[!duplicated(groups[,o0i-2]),]
-    }
-    omega <- c(omega, list(res))
-    oind <- oind + noind
-  } # closes main for loop for(o0i in 2:length(omega0))
-  omega
-}
 
-# function that returns the likelihood, by group, evaulated at a point
-adapterLnL <- function(y, X, levels, Z, ZFull, weights, k, qp,
-                       covariance_constructor, omega, omegaFull, omega0, par0,
-                       verbose, Qi, QiFull, olvl, acc, family) {
-  # olvl is the level we are optimizing now
-  function(par, long=FALSE) {
-    # notice par here is a new displacement in the random effect location
-    # not par0, which is a set of mixed model parameters
-    yadj <- 0
-    o0 <- omega0
-    nzi <- 0 # number of Z columns at olvl
- 
-    for(i in 1:olvl) {
-      if(!is.null(Z[[i]])) {
-        ki <- ncol(Z[[i]])
-        if(i == olvl) {
-          nzi <- ki
+    postModeVar <- pirls_u(y,X,Z_mat,lambda,u=old_u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
+                           l2_group_sizes,group_sizes,n_l2,n_top,levels,q2,q3,by_group=TRUE)
+    #old_u <<- 
+    muHat <- postModeVar$modes
+    
+    L <- postModeVar$hess
+    R <- Matrix::t(as(L,"sparseMatrix"))
+    
+    if(nQuad == 1){
+      llh <- postModeVar$logLik
+    } else {
+      # get the adapted quadrature locations for levels 2 and 3
+      adapted_points <- makeAdaptedPts(muHat,R,nQuad,levels,q2,q3,n_l2,n_top)
+      new_l2 <- adapted_points$adapt_l2
+      l2_weights <- adapted_points$l2_weights
+      Z_lambda <- Z_mat%*%lambda
+      
+      combined <- adapted_points$adapt_comb
+      eta <- as.matrix(as.vector(X%*%beta) + Z_lambda%*%combined)
+      mu <- family$linkinv(eta)
+      # weights refers to the unit weights, which default to 1
+      glm_llh <- family$lnl(y,mu,w1c,sd=NULL)
+      norm_llh_l2 <- -0.5*rowsum(as.matrix(new_l2^2),group=rep(1:n_l2,each=q2))
+      llh_l2_point <- rowsum(glm_llh,group=rep(1:n_l2,times=l2_group_sizes)) + norm_llh_l2
+      
+      # TO-DO: figure out more elegant way to do this - idea is summing up the point
+      # values within a single level 3 group (i.e. sum up the 'l' level 2 points at
+      # level 3 point 'k')
+      
+      if(levels == 3){
+        w3 <- weights[[3]]$w
+        new_l3 <- adapted_points$adapt_l3
+        l3_weights <- adapted_points$l3_weights
+        
+        llh_l2_inner_sum <- vector()
+        
+        for(i in 1:nQuad^q3){
+          llh_l2_inner_sum <- cbind(llh_l2_inner_sum, 
+                                    rowLogSumExps(llh_l2_point[,((i-1)*(nQuad^q2) + 1):((nQuad^q2)*i)] + 
+                                                    rep(log(l2_weights),each=n_l2)))
         }
-        if(ki >= 1) {
-          # keep track of update in omega for calculation of prior prob
-          # yadj is moved by omega, but also to account for an addition change 
-          # controlled by par
-          zAdjust <- apply(ZFull[[i]] * omegaFull[[i]],1,sum)
-          if(olvl == i) {
-            zAdjust <- zAdjust + ZFull[[i]] %*% par[1:ki]
-            for(kii in 1:ki) {
-              o0[[i]][,kii] <- o0[[i]][,kii] + par[kii]
-            }
-            par <- par[-(1:ki)]
-          }
-          # for olvl > 2, zAdjust has the wrong number of rows and need to be mapped
-          # back to yp using the weights
-          yadj <- yadj + zAdjust
-        } # ends if  if(ki >= 1) 
-      } # ends  if(!is.null(Z[[i]]))
-    } #ends for(i in 1:olvl)
-    # evaluate the likelihood
-    beta <- par0[1:k]
-    parC <- covariance_constructor(par0[-(1:k)])
-
-    # Set curavtures Q for lower level to matrix of 0 
-    # This is becasue the curvature is 0 at the maximum 
-    # used for calculated likelihood by groups. 
-    Qi_ <- matrix(0, nrow=nzi, ncol=nzi*nrow(weights[[olvl-1]])) # this needs to be the Qi for lower levels
-    Qi__ <- c(Qi, list(Qi_))
-    QiFull_ <- matrix(0, nrow=nzi, ncol=nzi*nrow(X)) # this needs to be the Qi for lower levels
-    QiFull__ <- c(Qi, list(QiFull_))
-
-    #use helper funciton to return the likelihood contribution of teach group 
-   
-    loglikelihoodByGroup <- calc.lin.lnl.quad(y=y, yhat=X %*% beta + yadj, level=olvl,
-                                              Z, Qi=Qi__,
-                                              omega=lapply(omega, function(omegai) {0*omegai}),
-                                              W=weights, C=parC, qp, top=FALSE,
-                                              atPoint=TRUE, verbose=verbose,
-                                              acc=acc, ZFull=ZFull,
-                                              omegaFull=omegaFull, QiFull=QiFull__,
-                                              family=family)
-    Cl <- parC[[olvl]]
-    # apply multivatiate normal pdf to get posterior for each gorup 
-    posteriorByGroup <- apply(o0[[olvl]], MARGIN=1, function(p) {
-      mvnpdfC(as.matrix(p), rep(0, length = length(p)), varcovM=Cl%*%t(Cl), Log=TRUE)
-                        })
-    if(long) {
-      return(list(res=loglikelihoodByGroup + posteriorByGroup,
-                  loglikelihoodByGroup=loglikelihoodByGroup,
-                  posteriorByGroup=posteriorByGroup))
+        
+        norm_llh_l3 <- -0.5*rowsum(as.matrix(new_l3^2),group=rep(1:n_top,each=q3))
+        llh_l3_point <- rowsum(w2c*llh_l2_inner_sum,group=rep(1:n_top,times=group_sizes)) + norm_llh_l3
+        
+        llh_l3 <- w3*rowLogSumExps(llh_l3_point + rep(log(l3_weights),each=n_top))
+        
+        llh <- llh_l3 - postModeVar$det_by_group
+      } else {
+        llh_l2 <- w2*rowLogSumExps(llh_l2_point + rep(log(l2_weights),each=n_l2))
+        llh <- llh_l2 - postModeVar$det_by_group
+      }
+      
     }
-    #final return 
-    loglikelihoodByGroup + posteriorByGroup
+    if(top){
+      sum(llh)
+    }else{
+      llh
+    }
   } #ends  funciton to be return function(par, long=FALSE) 
 } 
 
@@ -1448,6 +1253,7 @@ dropNonPositiveWeights <- function(data, weights) {
   return(data)
 }
 
+# return unconditional weights
 getWgts0 <- function(data, weights, cWeights) {
   wgts0 <- data[ , weights]
   if(cWeights) {
@@ -1457,6 +1263,18 @@ getWgts0 <- function(data, weights, cWeights) {
   }
   return(wgts0)
 }
+
+# get conditional weights
+getWgtsC <- function(data, weights, cWeights) {
+  wgtsC <- data[ , weights]
+  if(!cWeights) {
+    for(i in (ncol(wgtsC)-1):1) {
+      wgtsC[ , i] <- wgtsC[ , i]/wgtsC[ , i+1]
+    }
+  }
+  return(wgtsC)
+}
+
 
 sumsq <- function(x) {
   sum(x^2)

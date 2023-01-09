@@ -50,7 +50,7 @@ models evaluated by adaptive quadrature.}
 
 \item{verbose}{logical, default \code{FALSE}; set to \code{TRUE} to print results of intermediate steps of adaptive quadrature. Only applies to non-linear models.}
 
-\item{acc0}{integer, the precision of \code{mpfr}, default 120. Only  applies to non-linear models.}
+\item{acc0}{deprecated; ignored.}
 
 \item{keepAdapting}{logical, set to \code{TRUE} when the adaptive quadrature should adapt after every Newton step. Defaults to \code{FALSE}. 
 \code{FALSE} should be used for faster (but less accurate) results. Only applies to non-linear models.}
@@ -182,5 +182,5 @@ summary(m1c)
 }
 }
 \author{
-Paul Bailey, Claire Kelley, and Trang Nguyen
+Paul Bailey, Blue Webb, Claire Kelley, and Trang Nguyen
 }

@@ -1,20 +1,25 @@
 Package: WeMix
-Version: 3.3.0
-Date: 2022-12-20
+Version: 4.0.9000
+Date: 2023-01-05
 Title: Weighted Mixed-Effects Models Using Multilevel Pseudo Maximum
         Likelihood Estimation
 Authors@R: c(person("Emmanuel", "Sikali", role="pdr", email = "Emmanuel.Sikali@ed.gov"),
              person("Paul", "Bailey", role=c("aut", "cre"), email="pbailey@air.org"),
+             person("Blue", "Webb", role="aut"),
              person("Claire", "Kelley", role="aut"),
              person("Trang", "Nguyen", role="aut"),
              person("Huade", "Huo", role="aut"),
+             person("Steve","Walker",role="cph",comment="lme4pureR PIRLS function"),
+             person("Doug","Bates",role="cph",comment="lme4pureR PIRLS function"),
              person("Eric", "Buehler", role="ctb"),
              person("Christian", "Kjeldsen", role="ctb"))
 Maintainer: Paul Bailey <pbailey@air.org>
 Depends: lme4, R (>= 3.5.0)
-Imports: numDeriv, statmod, Rmpfr, NPflow, Matrix, methods, minqa
-Suggests: testthat, knitr, rmarkdown, withr, tidyr, EdSurvey (>= 2.6.1)
-Description: Run mixed-effects models that include weights at every level. The WeMix package fits a weighted mixed model, also known as a multilevel, mixed, or hierarchical linear model (HLM). The weights could be inverse selection probabilities, such as those developed for an education survey where schools are sampled probabilistically, and then students inside of those schools are sampled probabilistically. Although mixed-effects models are already available in R, WeMix is unique in implementing methods for mixed models using weights at multiple levels. Both linear and logit models are supported. Models may have up to three levels. 
+Imports: numDeriv, statmod, Rmpfr, NPflow, Matrix, methods, minqa,
+        matrixStats
+Suggests: testthat, knitr, rmarkdown, withr, tidyr, EdSurvey (>=
+        2.6.1), glmmTMB
+Description: Run mixed-effects models that include weights at every level. The WeMix package fits a weighted mixed model, also known as a multilevel, mixed, or hierarchical linear model (HLM). The weights could be inverse selection probabilities, such as those developed for an education survey where schools are sampled probabilistically, and then students inside of those schools are sampled probabilistically. Although mixed-effects models are already available in R, WeMix is unique in implementing methods for mixed models using weights at multiple levels. Both linear and logit models are supported. Models may have up to three levels. Random effects are estimated using the PIRLS algorithm from 'lme4pureR' (Walker and Bates (2013) <https://github.com/lme4/lme4pureR>).
 License: GPL-2
 VignetteBuilder: knitr
 ByteCompile: true
@@ -27,11 +32,14 @@ URL: https://american-institutes-for-research.github.io/WeMix/
 BugReports: https://github.com/American-Institutes-for-Research/WeMix/issues
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2022-12-23 04:47:49 UTC; pbailey
+Packaged: 2023-01-09 20:33:37 UTC; pbailey
 Author: Emmanuel Sikali [pdr],
   Paul Bailey [aut, cre],
+  Blue Webb [aut],
   Claire Kelley [aut],
   Trang Nguyen [aut],
   Huade Huo [aut],
+  Steve Walker [cph] (lme4pureR PIRLS function),
+  Doug Bates [cph] (lme4pureR PIRLS function),
   Eric Buehler [ctb],
   Christian Kjeldsen [ctb]
