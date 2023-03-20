@@ -404,3 +404,17 @@ makeUMatList <- function(bhatq, Zlist, theta) {
   names(res) <- ufirstEffects
   return(res)
 }
+
+nearPD2 <- function(X, tol=400, warn="") {
+  # this is faster but will mean another package dependency
+  #eig <- RSpectra::eigs_sym(as.matrix(X), 2, which = "BE", opts = list(retvec = FALSE))
+  eig <- eigen(X,symmetric=TRUE,only.values = TRUE)
+  if(min(eig$values) <= 0 || max(eig$values)/min(eig$values) >= 1/((.Machine$double.eps)^0.25)) {
+    if(nchar(warn) > 0) {
+      warning(warn)
+    }
+    X <- nearPD(X,  posd.tol=tol*sqrt(.Machine$double.eps))$mat
+  }
+  return(X)
+}
+

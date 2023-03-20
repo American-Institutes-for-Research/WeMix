@@ -11,7 +11,7 @@
 #' @param nQuad an optional integer  number of quadrature points to evaluate models solved by adaptive quadrature.
 #'  Only non-linear models are evaluated with adaptive quadrature. See notes for additional guidelines. 
 #' @param max_iteration a optional integer, for non-linear models fit by adaptive quadrature which limits number of iterations allowed
-#'   before quitting. Defaults  to 10. This is used because if the liklihood surface is flat, 
+#'   before quitting. Defaults  to 10. This is used because if the likelihood surface is flat, 
 #'   models may run for a very  long time without converging.
 #' @param run  logical; \code{TRUE} runs the model while \code{FALSE} provides partial output for debugging or testing. Only applies to non-linear
 #'  models evaluated by adaptive quadrature. 
@@ -20,14 +20,16 @@
 #' @param verbose logical, default \code{FALSE}; set to \code{TRUE} to print results of intermediate steps of adaptive quadrature. Only applies to non-linear models.
 #' @param start optional numeric vector representing the point at which the model should start optimization; takes the shape of c(coef, vars) 
 #' from results (see help). 
-#' @param family the family; optionally used to specify generalized linear mixed models. Currently only \code{binomial(link="logit")} is supported.
+#' @param family the family; optionally used to specify generalized linear mixed models. Currently only \code{binomial()} 
+#' and \code{poisson()} are supported.
 #' @param acc0 deprecated; ignored. 
 #' @param fast logical; deprecated
 #' @description
 #' Implements a survey weighted mixed-effects model using the provided formula. 
 #' @details
 #' Linear models are solved using a modification of the analytic solution developed by Bates and Pinheiro (1998).
-#' Non-linear models are solved using adaptive quadrature following the method in STATA's GLAMMM (Rabe-Hesketh & Skrondal, 2006).
+#' Non-linear models are solved using adaptive quadrature following the methods in STATA's GLAMMM (Rabe-Hesketh & Skrondal, 2006) 
+#' and Pineiro and Chao (2006). The posterior modes used in adaptive quadrature are determined following the method in lme4pureR (Walker & Bates, 2015).
 #' For additional details, see the vignettes \emph{Weighted Mixed Models: Adaptive Quadrature} and  \emph{Weighted Mixed Models: Analytical Solution} 
 #' which provide extensive examples as well as a description of the mathematical basis of the estimation procedure and comparisons to model 
 #' specifications in other common software. 
@@ -42,6 +44,7 @@
 #' \item For non-linear models, when the variance of a random effect is very low (<.1), WeMix doesn't estimate it, because very 
 #' low variances create problems with  numerical evaluation. In these cases, consider estimating without that random effect. 
 #'  \item The model is estimated by maximum likelihood estimation.
+#'  \item Non-linear models may have up to 3 nested levels.
 #' \item To choose the number of quadrature points for non-linear model evaluation, a balance is needed between accuracy and
 #' speed; estimation time increases quadratically with the number of points chosen. In addition, an odd number of points is 
 #' traditionally used. We recommend starting at 13 and increasing or decreasing as needed. 
@@ -50,7 +53,7 @@
 #' @importFrom stats dnorm aggregate terms dpois dgamma dbinom ave model.matrix terms.formula as.formula sigma complete.cases update
 #' @importFrom numDeriv genD hessian grad
 #' @importFrom minqa bobyqa 
-#' @importFrom Matrix nearPD sparse.model.matrix Cholesky Matrix .updateCHMfactor
+#' @importFrom Matrix nearPD sparse.model.matrix Cholesky Matrix .updateCHMfactor tril
 #' @importFrom matrixStats rowLogSumExps
 #' @return object of class \code{WeMixResults}. 
 #' This is a list with elements: 
@@ -368,7 +371,9 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   names(est0)[-(1:k)] <- lmeVarDF$grp
   
   #add full variable name to lmeVarDF for later use 
-  lmeVarDF$fullGroup <- paste0(lmeVarDF$grp, ifelse(!is.na(lmeVarDF$var1), paste0(".", lmeVarDF$var1), ""))
+  lmeVarDF$fullGroup <- paste0(lmeVarDF$grp,ifelse(!is.na(lmeVarDF$var2), paste0(".", lmeVarDF$var2), ""),
+                               ifelse(!is.na(lmeVarDF$var1), paste0(".", lmeVarDF$var1), ""))
+  lmeVarDF$theta <- getME(lme,"theta")[lmeVarDF$fullGroup]
 
   # use helper funtion to create a covariance matrix from the data frame with variance and covariance information
   covarianceConstructor <- covMat2Cov(lmeVarDF)
@@ -656,7 +661,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #############################################
   #     3) Maximum Likelihood estimation      #
   #############################################
-  
   # this gets used in optimization
   main_lnl <- main_lnl_container(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
                                  l2_group_sizes,group_sizes,levels,weights,
@@ -666,12 +670,15 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   main_lnlR <- lnl_by_group(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
                             l2_group_sizes,group_sizes,levels,weights,
                             weights_cond,nQuad,family,parameterization = "var")
-  tol <- 1e-8
+  tol <- 1e-5
   not_converged <- TRUE
   iteration <- 0
   est <- est0
-  vcov.tmp <- est[-(1:ncol(X))]
-  est <- c(est[1:ncol(X)],sqrt(abs(vcov.tmp)))
+  # sometimes lme4 model doesn't converge when fit on the unweighted,
+  # which can lead to near 0 estimates of some thetas. to combat this
+  # we set a floor at +/-0.001
+  sign <- sign(lmeVarDF$theta) + ifelse(sign(lmeVarDF$theta) == 0,1,0)
+  est <- c(est[1:ncol(X)],sign*pmax(abs(lmeVarDF$theta),0.001))
 
   while(iteration < max_iteration & not_converged){
     step_size <- 1
@@ -708,7 +715,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     if(max(pmin(abs(est*g), abs(g))) < tol){
       not_converged <- FALSE
     }
-    
     iteration <- iteration + 1
   }
 
@@ -733,20 +739,24 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   
   # make est numeric
   est.chol <- as.numeric(est)
-  order <- vector(mode="numeric")
-  if(q2==1){
-    order <- c(1)
-  }else{
-    order <- c(1,3,2)
+  est_tmp <- vector()
+  l2_var <- unique(diag(Sigma))[1:q2]
+  est_tmp <- c(est_tmp,l2_var)
+  if(q2 > 1){
+    l2_cov <- unique(tril(Sigma,-1)@x)
+    l2_cov <- l2_cov[1:choose(q2,2)]
+    est_tmp <- c(est_tmp,l2_cov)
   }
-  if(levels==3){
-    if(q3 == 1){
-      order <- c(order,max(order)+1)
-    }else{
-      order <- c(order,max(order)+1,max(order)+3,max(order)+2)
-    } 
+  if(levels == 3){
+    l3_var <- unique(diag(Sigma))[(q2+1):(q2+q3)]
+    est_tmp <- c(est_tmp,l3_var)
+    if(q3 > 1){
+      l3_cov <- unique(tril(Sigma,-1)@x)
+      l3_cov <- l3_cov[(choose(q2,2)+1):(choose(q2,2)+choose(q3,2))]
+      est_tmp <- c(est_tmp,l3_cov)
+    }
   }
-  est[-(1:k)] <- unique(Sigma@x)[order]
+  est[-(1:k)] <- est_tmp
   # make sure the names agree with lmer
   names(est) <- names(parlme)
   
@@ -755,8 +765,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   main_lnl <- main_lnl_container(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
                                  l2_group_sizes,group_sizes,levels,weights,
                                  weights_cond,nQuad,family,parameterization = "var")
-
-  hessian <- getHessian(main_lnl,est)
+  hessian <- getGradHess(main_lnl,est)$hess
   # fix vars that are less than one to be mapped
   covs_and_vars <- est[-(1:k)]
   vars <- covs_and_vars[which(is.na(lmeVarDF$var2))] #select only vars not covars 
@@ -793,7 +802,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   varDF$fullGroup <- paste0(varDF$grp,ifelse(!is.na(varDF$var1),paste0(".",varDF$var1),""))
   
   varDF$vcov <- vars #re assign in variance from mix.
-  
+
   res <- list(lnlf=main_lnlR, lnl=lnl_final, coef=est[1:k], vars=vars,
               call=call, levels=levels, ICC=ICC, CMODE=u_vector,
               invHessian=hessian, is_adaptive=TRUE, ngroups=ngroups, varDF=varDF,
@@ -802,7 +811,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   return(res)
 }
 
-
+# based on lme4pureR pirls implementation by Steve Walker and Doug Bates,
+# modified by Blue Webb
 pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
                     l2_group_sizes,group_sizes,n_l2,n_top,levels,q2,q3,by_group=FALSE){
   
@@ -852,7 +862,10 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
     }
     
     ucden <- updatemu(u + delu)
-    
+    if(is.na(ucden) | !is.finite(ucden)){
+      ucden <- updatemu(u - delu)
+    }
+
     while(step_size > 0.001 && ucden > olducden){
       step_size <- step_size/2
       ucden <- updatemu(u + step_size*delu)
@@ -878,7 +891,7 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
     L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
   }
   L <- as(L,"sparseMatrix")
-
+  
   llh <- -0.5*family$aic(y,rep.int(1,length(y)),mu,wt=w1,dev=NULL) - 0.5*sum(PsiVec*u^2) - 
     Matrix::determinant((L/sqrt(PsiVec))^PsiVec)$modulus
   
@@ -986,8 +999,12 @@ constructSigma <- function(vcov,nRE,n_l2,n_top){
   }
 
   if(length(nRE) == 1){
-    mat_list <- replicate(n_l2,l2_mat,simplify = FALSE)
-    group_sigma <- bdiag(mat_list)
+    if(q2 == 1){
+      group_sigma <- Diagonal(x=rep(l2_var,n_l2))
+    }else{
+      mat_list <- replicate(n_l2,l2_mat,simplify = FALSE)
+      group_sigma <- bdiag(mat_list)
+    }
   }
   
   # for three levels, we need to create a block-diagonal matrix
@@ -1005,7 +1022,6 @@ constructSigma <- function(vcov,nRE,n_l2,n_top){
     }
 
     mat_list <- c(replicate(n_l2,l2_mat,simplify = FALSE),replicate(n_top,l3_mat,simplify = FALSE))
-    
     group_sigma <- bdiag(mat_list)
   }
   
@@ -1014,29 +1030,36 @@ constructSigma <- function(vcov,nRE,n_l2,n_top){
 }
 
 updateLambda <- function(lambda,vcov,q2,q3,n_l2,n_top){
-
-  if(q2 == 1){
-    l2_theta <- rep(vcov[1],n_l2)
-    if(length(vcov)>1){
-      vcov_l3 <- vcov[2:length(vcov)]
-    }
-  }else{
-    l2_theta <- rep(c(vcov[1],vcov[3],vcov[2]),n_l2)
-    if(length(vcov)>3){
-      vcov_l3 <- vcov[4:length(vcov)]
-    }
+  
+  vcov_l2 <- vcov[1:(q2+choose(q2,2))]
+  var_l2 <- vcov_l2[1:q2]
+  tmp_l2_mat <- diag(var_l2,ncol=q2,nrow=q2)
+  
+  if(q2 > 1){
+    cov_l2 <- vcov_l2[-(1:q2)]
+    tmp_l2_mat[lower.tri(tmp_l2_mat)] <- cov_l2
   }
+
+  tmp_l2_mat <- as(tmp_l2_mat,"sparseMatrix")
+  
+  l2_theta <- rep(unique(tmp_l2_mat@x),n_l2)
   
   if(q3 != 0){
-    if(q3 == 1){
-      l3_theta <- rep(vcov_l3[1],n_top)
-    }else{
-      l3_theta <- rep(c(vcov_l3[1],vcov_l3[3],vcov_l3[2]),n_top)
+    vcov_l3 <- vcov[(q2 + choose(q2,2) + 1):length(vcov)]
+    var_l3 <- vcov_l3[1:q3]
+    tmp_l3_mat <- diag(var_l3,ncol=q3,nrow=q3)
+    if(q3 > 1){
+      cov_l3 <- vcov_l3[-(1:q3)]
+      tmp_l3_mat[lower.tri(tmp_l3_mat)] <- cov_l3
     }
+    tmp_l3_mat <- as(tmp_l3_mat,"sparseMatrix")
+    
+    l3_theta <- rep(unique(tmp_l3_mat@x),n_top)
     lambda@x <- c(l2_theta,l3_theta)
   }else{
     lambda@x <- l2_theta
   }
+  
   
   lambda
 }
@@ -1079,7 +1102,7 @@ main_lnl_container <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
     beta <- thetabeta[1:ncol(X)]
     vcov <- thetabeta[-(1:ncol(X))]
     if(parameterization != "cholesky"){
-      sigma_mat <- as(nearPD(Matrix(constructSigma(vcov,nRE,n_l2,n_top)))$mat,"sparseMatrix")
+      sigma_mat <- as(nearPD2(Matrix(constructSigma(vcov,nRE,n_l2,n_top))),"sparseMatrix")
       lambda <- as(Cholesky(sigma_mat),"sparseMatrix")
     }else{
       lambda <- updateLambda(lambda,vcov,q2,q3,n_l2,n_top)
@@ -1087,7 +1110,7 @@ main_lnl_container <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
 
     postModeVar <- pirls_u(y,X,Z_mat,lambda,u=old_u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
                            l2_group_sizes,group_sizes,n_l2,n_top,levels,q2,q3,by_group=FALSE)
-    #old_u <<- 
+   
     muHat <- postModeVar$modes
     
     L <- postModeVar$hess
@@ -1116,7 +1139,7 @@ main_lnl_container <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
       # TO-DO: figure out more elegant way to do this - idea is summing up the point
       # values within a single level 3 group (i.e. sum up the 'l' level 2 points at
       # level 3 point 'k')
-      
+
       if(levels == 3){
         w3 <- weights[[3]]$w
         new_l3 <- adapted_points$adapt_l3
@@ -1181,7 +1204,7 @@ lnl_by_group <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
 
     postModeVar <- pirls_u(y,X,Z_mat,lambda,u=old_u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
                            l2_group_sizes,group_sizes,n_l2,n_top,levels,q2,q3,by_group=TRUE)
-    #old_u <<- 
+ 
     muHat <- postModeVar$modes
     
     L <- postModeVar$hess
@@ -1191,7 +1214,7 @@ lnl_by_group <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
       llh <- postModeVar$logLik
     } else {
       # get the adapted quadrature locations for levels 2 and 3
-      adapted_points <- makeAdaptedPts(muHat,R,nQuad,levels,q2,q3,n_l2,n_top)
+      adapted_points <- makeAdaptedPts(muHat,R/sqrt(PsiVec),nQuad,levels,q2,q3,n_l2,n_top)
       new_l2 <- adapted_points$adapt_l2
       l2_weights <- adapted_points$l2_weights
       Z_lambda <- Z_mat%*%lambda
@@ -1207,7 +1230,7 @@ lnl_by_group <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
       # TO-DO: figure out more elegant way to do this - idea is summing up the point
       # values within a single level 3 group (i.e. sum up the 'l' level 2 points at
       # level 3 point 'k')
-      
+
       if(levels == 3){
         w3 <- weights[[3]]$w
         new_l3 <- adapted_points$adapt_l3
@@ -1385,7 +1408,7 @@ setup_family <- function(family) {
     if(!inherits(family, "family")) {
       stop(paste0("The family argument must be of class ", dQuote("family"), "."))
     }
-    if(!family$family %in% c("binomial", "poisson", "gaussian")) {
+    if(!family$family %in% c("binomial", "poisson")) {
       stop("Unimplemented family, ", dQuote(family$family))
     }
     family$lnl <- switch(family$family,

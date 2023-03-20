@@ -59,7 +59,6 @@ test_that("The model runs", {
                tolerance=tolerance)
 })
 
-
 context("Factor binomial")
 test_that("Factor binomial", {
   sleepstudyM <- sleepstudyU
@@ -795,6 +794,22 @@ test_that("Weighted v unweighted replicated two level model, poisson", {
   expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
   expect_equal(coef(wmw), coef(wm0), tol=1e-4)
   expect_equal(wmw$vars, wm0$vars, tol=1e-4)
+})
+
+context("Quadrature works, 3 RE at level 2")
+test_that("Quadrature works, 3 RE at level 2", {
+  skip_on_cran()
+  require(glmmTMB)
+  owls2 <- Owls
+  owls2$w1 <- 1 
+  owls2$w2 <- 1
+  owls2$w3 <- 1
+  
+  suppressWarnings(wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (ArrivalTime + NegPerChick|Nest), 
+                              data=owls2, weights=c("w1", "w2"), 
+                              family=poisson(),verbose=FALSE,nQuad=7))
+  expect_is(wm0, "WeMixResults")
+  
 })
 
 context("Three level model slash and colon")

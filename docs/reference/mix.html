@@ -17,7 +17,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">WeMix</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">4.0.9000</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">4.0.0</span>
       </span>
     </div>
 
@@ -113,7 +113,7 @@ education: <code>~education</code>. Default is NULL which does no centering.</p>
 
 <dt>max_iteration</dt>
 <dd><p>a optional integer, for non-linear models fit by adaptive quadrature which limits number of iterations allowed
-before quitting. Defaults  to 10. This is used because if the liklihood surface is flat, 
+before quitting. Defaults  to 10. This is used because if the likelihood surface is flat, 
 models may run for a very  long time without converging.</p></dd>
 
 
@@ -150,7 +150,8 @@ from results (see help).</p></dd>
 
 
 <dt>family</dt>
-<dd><p>the family; optionally used to specify generalized linear mixed models. Currently only <code>binomial(link="logit")</code> is supported.</p></dd>
+<dd><p>the family; optionally used to specify generalized linear mixed models. Currently only <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial()</a></code> 
+and <code><a href="https://rdrr.io/r/stats/family.html" class="external-link">poisson()</a></code> are supported.</p></dd>
 
 </dl></div>
     <div id="value">
@@ -229,7 +230,8 @@ This is a list with elements:</p>
     <div id="details">
     <h2>Details</h2>
     <p>Linear models are solved using a modification of the analytic solution developed by Bates and Pinheiro (1998).
-Non-linear models are solved using adaptive quadrature following the method in STATA's GLAMMM (Rabe-Hesketh &amp; Skrondal, 2006).
+Non-linear models are solved using adaptive quadrature following the methods in STATA's GLAMMM (Rabe-Hesketh &amp; Skrondal, 2006) 
+and Pineiro and Chao (2006). The posterior modes used in adaptive quadrature are determined following the method in lme4pureR (Walker &amp; Bates, 2015).
 For additional details, see the vignettes <em>Weighted Mixed Models: Adaptive Quadrature</em> and  <em>Weighted Mixed Models: Analytical Solution</em> 
 which provide extensive examples as well as a description of the mathematical basis of the estimation procedure and comparisons to model 
 specifications in other common software. 
@@ -242,6 +244,7 @@ because it is much faster.</p></li>
 <li><p>For non-linear models, when the variance of a random effect is very low (&lt;.1), WeMix doesn't estimate it, because very 
 low variances create problems with  numerical evaluation. In these cases, consider estimating without that random effect.</p></li>
 <li><p>The model is estimated by maximum likelihood estimation.</p></li>
+<li><p>Non-linear models may have up to 3 nested levels.</p></li>
 <li><p>To choose the number of quadrature points for non-linear model evaluation, a balance is needed between accuracy and
 speed; estimation time increases quadratically with the number of points chosen. In addition, an odd number of points is 
 traditionally used. We recommend starting at 13 and increasing or decreasing as needed.</p></li>

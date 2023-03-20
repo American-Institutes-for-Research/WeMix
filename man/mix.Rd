@@ -39,7 +39,7 @@ variable names to be group mean centered; for example to group mean center gende
 education: \code{~education}. Default is NULL which does no centering.}
 
 \item{max_iteration}{a optional integer, for non-linear models fit by adaptive quadrature which limits number of iterations allowed
-before quitting. Defaults  to 10. This is used because if the liklihood surface is flat, 
+before quitting. Defaults  to 10. This is used because if the likelihood surface is flat, 
 models may run for a very  long time without converging.}
 
 \item{nQuad}{an optional integer  number of quadrature points to evaluate models solved by adaptive quadrature.
@@ -60,7 +60,8 @@ from results (see help).}
 
 \item{fast}{logical; deprecated}
 
-\item{family}{the family; optionally used to specify generalized linear mixed models. Currently only \code{binomial(link="logit")} is supported.}
+\item{family}{the family; optionally used to specify generalized linear mixed models. Currently only \code{binomial()} 
+and \code{poisson()} are supported.}
 }
 \value{
 object of class \code{WeMixResults}. 
@@ -93,7 +94,8 @@ Implements a survey weighted mixed-effects model using the provided formula.
 }
 \details{
 Linear models are solved using a modification of the analytic solution developed by Bates and Pinheiro (1998).
-Non-linear models are solved using adaptive quadrature following the method in STATA's GLAMMM (Rabe-Hesketh & Skrondal, 2006).
+Non-linear models are solved using adaptive quadrature following the methods in STATA's GLAMMM (Rabe-Hesketh & Skrondal, 2006) 
+and Pineiro and Chao (2006). The posterior modes used in adaptive quadrature are determined following the method in lme4pureR (Walker & Bates, 2015).
 For additional details, see the vignettes \emph{Weighted Mixed Models: Adaptive Quadrature} and  \emph{Weighted Mixed Models: Analytical Solution} 
 which provide extensive examples as well as a description of the mathematical basis of the estimation procedure and comparisons to model 
 specifications in other common software. 
@@ -108,6 +110,7 @@ because it is much faster.
 \item For non-linear models, when the variance of a random effect is very low (<.1), WeMix doesn't estimate it, because very 
 low variances create problems with  numerical evaluation. In these cases, consider estimating without that random effect. 
  \item The model is estimated by maximum likelihood estimation.
+ \item Non-linear models may have up to 3 nested levels.
 \item To choose the number of quadrature points for non-linear model evaluation, a balance is needed between accuracy and
 speed; estimation time increases quadratically with the number of points chosen. In addition, an odd number of points is 
 traditionally used. We recommend starting at 13 and increasing or decreasing as needed. 

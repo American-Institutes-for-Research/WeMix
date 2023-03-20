@@ -1,7 +1,7 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
-\section{Changes in version 3.3.0}{
+\section{Changes in version 4.0.0}{
   \subsection{NEW FEATURES}{
     \itemize{
       \item the \code{mix} function now fits weighted binomial and Poisson models with up to three levels. This update uses, at the user's request the LaPlace approximation or adaptive Gauss-Hermite Quadrature (AGHQ). To achieve that, we use penalized iteratively reweighted least squares (PIRLS) with code based on \code{lme4pureR} package by Steve Walker and Doug Bates. Use \code{nQuad=1} for LaPlace, and \code{nQuad>1} for AGHQ.
