@@ -2,6 +2,14 @@
 \title{NEWS for WeMix}
 
 \section{Changes in version 4.0.0}{
+  \subsection{BIG FIXES}{
+    \itemize{
+      \item the \code{mix} function documentation now notes that the coefficient standard errors are always cluster robust (CR-0) estimates. Thanks to Francis Huang for pointing out that it previously mentioned a non-existent argument.
+    }
+  }
+}
+
+\section{Changes in version 4.0.0}{
   \subsection{NEW FEATURES}{
     \itemize{
       \item the \code{mix} function now fits weighted binomial and Poisson models with up to three levels. This update uses, at the user's request the LaPlace approximation or adaptive Gauss-Hermite Quadrature (AGHQ). To achieve that, we use penalized iteratively reweighted least squares (PIRLS) with code based on \code{lme4pureR} package by Steve Walker and Doug Bates. Use \code{nQuad=1} for LaPlace, and \code{nQuad>1} for AGHQ.

@@ -33,7 +33,7 @@
       </button>
       <span class="navbar-brand">
         <a class="navbar-link" href="../index.html">WeMix</a>
-        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">4.0.0</span>
+        <span class="version label label-default" data-toggle="tooltip" data-placement="bottom" title="">4.0.9000</span>
       </span>
     </div>
 
@@ -75,11 +75,13 @@
 
       
 
-      </header><script src="Introduction_to_Mixed_Effects_Models_With_WeMix_files/accessible-code-block-0.0.1/empty-anchor.js"></script><div class="row">
+      </header><div class="row">
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
-      <h1 data-toc-skip>Introduction to Weighted Mixed-Effects Models With WeMix</h1>
-                        <h4 data-toc-skip class="author">Developed by Paul Bailey, Claire Kelley, and Trang Nguyen </h4>
+      <h1 data-toc-skip>Introduction to Weighted Mixed-Effects Models
+With WeMix</h1>
+                        <h4 data-toc-skip class="author">Developed by
+Paul Bailey, Claire Kelley, and Trang Nguyen </h4>
             
             <h4 data-toc-skip class="date">June 17, 2019</h4>
       
@@ -93,9 +95,31 @@
 <div class="section level2">
 <h2 id="introduction">Introduction<a class="anchor" aria-label="anchor" href="#introduction"></a>
 </h2>
-<p>The  package fits ighted ed models, also known as a multilevel, mixed, or hierarchical linear model (HLM). The weights could be inverse selection probabilities, such as those developed for an education survey where schools are sampled probabilistically, and then students inside those schools are sampled probabilistically. Although mixed-effects models are already available in ,  is unique in implementing methods for mixed models using weights at multiple levels and computing cluster-robust standard errors.</p>
-<p>The package  fits mixed models when there are no weights or weights only for first-level units (Bates, Maechler, Bolker, &amp; Walker, 2015) and is recommended when both of two conditions hold: no weights are above the first level, and cluster-robust standard errors are not required.  can fit models with weights at every level of the model and also calculates cluster-robust standard errors that account for covariance between units in the same groups.</p>
-<p>Linear models are fitted with an analytic solution to the integral; the method is similar to the one of Bates et al. (2015) but adapted for weighted hierarchical models—details of which can be found in the vignette “Weighted Linear Mixed-Effects Models.” Nonlinear models are fit with numerical quadrature using a method similar to GLLAMM (Rabe-Hesketh, Skrondal, &amp; Pickles, 2002, 2005; Rabe-Hesketh &amp; Skrondal, 2006)—see Appendix A, “Binomial Model Fitting.” Because the model applies weights at every level, the units must be nested in “levels,” so  only fits those models where the units have a nested structure.</p>
+<p>The package fits ighted ed models, also known as a multilevel, mixed,
+or hierarchical linear model (HLM). The weights could be inverse
+selection probabilities, such as those developed for an education survey
+where schools are sampled probabilistically, and then students inside
+those schools are sampled probabilistically. Although mixed-effects
+models are already available in , is unique in implementing methods for
+mixed models using weights at multiple levels and computing
+cluster-robust standard errors.</p>
+<p>The package fits mixed models when there are no weights or weights
+only for first-level units (Bates, Maechler, Bolker, &amp; Walker, 2015)
+and is recommended when both of two conditions hold: no weights are
+above the first level, and cluster-robust standard errors are not
+required. can fit models with weights at every level of the model and
+also calculates cluster-robust standard errors that account for
+covariance between units in the same groups.</p>
+<p>Linear models are fitted with an analytic solution to the integral;
+the method is similar to the one of Bates et al. (2015) but adapted for
+weighted hierarchical models—details of which can be found in the
+vignette “Weighted Linear Mixed-Effects Models.” Nonlinear models are
+fit with numerical quadrature using a method similar to GLLAMM
+(Rabe-Hesketh, Skrondal, &amp; Pickles, 2002, 2005; Rabe-Hesketh &amp;
+Skrondal, 2006)—see Appendix A, “Binomial Model Fitting.” Because the
+model applies weights at every level, the units must be nested in
+“levels,” so only fits those models where the units have a nested
+structure.</p>
 </div>
 <div class="section level2">
 <h2 id="installing-and-loading">Installing and Loading <a class="anchor" aria-label="anchor" href="#installing-and-loading"></a>
@@ -103,32 +127,54 @@
 <p>Inside , run the following command to install :</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"WeMix"</span><span class="op">)</span></span></code></pre></div>
-<p>Once the package is successfully installed,  can be loaded with the following command:</p>
+<p>Once the package is successfully installed, can be loaded with the
+following command:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://american-institutes-for-research.github.io/WeMix/" class="external-link">WeMix</a></span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="specifying-a-mixed-effects-model">Specifying a Mixed-Effects Model<a class="anchor" aria-label="anchor" href="#specifying-a-mixed-effects-model"></a>
 </h2>
-<p>To illustrate the functionality of , we will use an example based on publicly available data from the Programme for International Student Assessment (PISA) 2012 data for the United States (Organisation for Economic Co-operation and Development, 2013). PISA is a repeated multinational assessment of skills and attitudes of 15-year-olds, with students (the unit of observation) probabilistically sampled within schools (the second-level unit) that also are probabilistically sampled within the country. In the United States, there were 3,136 student observations in 157 schools. We provide examples of a model with a random intercept and a model with both a random slope and intercept.</p>
-<p>The first model can be specified as the mathematics assessment predicted by a few variables chosen from the PISA survey:</p>
+<p>To illustrate the functionality of , we will use an example based on
+publicly available data from the Programme for International Student
+Assessment (PISA) 2012 data for the United States (Organisation for
+Economic Co-operation and Development, 2013). PISA is a repeated
+multinational assessment of skills and attitudes of 15-year-olds, with
+students (the unit of observation) probabilistically sampled within
+schools (the second-level unit) that also are probabilistically sampled
+within the country. In the United States, there were 3,136 student
+observations in 157 schools. We provide examples of a model with a
+random intercept and a model with both a random slope and intercept.</p>
+<p>The first model can be specified as the mathematics assessment
+predicted by a few variables chosen from the PISA survey:</p>
 <ul>
 <li>Dependent variable: , a mathematics assessment score</li>
 <li>Independent variables:
 <ul>
 <li> continuous socio-economic status index</li>
-<li> school questionnaire item: “Is your school’s capacity to provide instruction hindered by any of the following… A lack of qualified mathematics teachers” (levels: “A lot”; “To some extent”; “Very little”; “Not at all”, the reference group)</li>
-<li> student gender (levels: “male” and “female,” the reference group)</li>
-<li> student questionnaire item: “I look forward to mathematics lessons” (levels: “Strongly agree”; “Agree”; “Disagree”; “Strongly disagree”, the reference group)</li>
+<li> school questionnaire item: “Is your school’s capacity to provide
+instruction hindered by any of the following… A lack of qualified
+mathematics teachers” (levels: “A lot”; “To some extent”; “Very little”;
+“Not at all”, the reference group)</li>
+<li> student gender (levels: “male” and “female,” the reference
+group)</li>
+<li> student questionnaire item: “I look forward to mathematics lessons”
+(levels: “Strongly agree”; “Agree”; “Disagree”; “Strongly disagree”, the
+reference group)</li>
 </ul>
 </li>
 <li>School-level random effect: school intercept</li>
 <li>Student-level weights: </li>
 <li>School-level weights: </li>
 </ul>
-<p>In the second model, a second random effect is added at the school level for the  variable, but there is no covariance between the two random effects.</p>
-<p>An appendix describes the transformation used to prepare the data for analysis.</p>
-<p><code>WeMix</code> calls for this model, using a <code>data.frame</code> containing the PISA 2012 data for the United States and named “data,” would be as follows:</p>
+<p>In the second model, a second random effect is added at the school
+level for the variable, but there is no covariance between the two
+random effects.</p>
+<p>An appendix describes the transformation used to prepare the data for
+analysis.</p>
+<p><code>WeMix</code> calls for this model, using a
+<code>data.frame</code> containing the PISA 2012 data for the United
+States and named “data,” would be as follows:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># model with one random effect</span></span>
 <span><span class="va">m1</span> <span class="op">&lt;-</span>  <span class="fu"><a href="../reference/mix.html">mix</a></span><span class="op">(</span><span class="va">pv1math</span> <span class="op">~</span> <span class="va">st29q03</span> <span class="op">+</span> <span class="va">sc14q02</span> <span class="op">+</span><span class="va">st04q01</span><span class="op">+</span><span class="va">escs</span><span class="op">+</span> <span class="op">(</span><span class="fl">1</span><span class="op">|</span><span class="va">schoolid</span><span class="op">)</span>, data<span class="op">=</span><span class="va">data</span>, </span>
@@ -141,69 +187,152 @@
 <span><span class="co">#Wald tests for beta and Lambda parameters </span></span>
 <span><span class="fu"><a href="../reference/waldTest.html">waldTest</a></span><span class="op">(</span><span class="va">m2</span>,type<span class="op">=</span><span class="st">"beta"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/waldTest.html">waldTest</a></span><span class="op">(</span><span class="va">m2</span>,type<span class="op">=</span><span class="st">"Lambda"</span><span class="op">)</span></span></code></pre></div>
-<p>Note that the syntax for the model formula is the same syntax one would use to specify a model using , except the weights argument. Thus, in the random slope and intercept model, the slope and intercept are in separate terms to constrain their covariance to be zero. For the weights argument, the weights are specified as a vector with the first element giving the name of the weights for level 1 units, the second element giving the name of the weights for the level 2 groups, and—when fitting a model with three levels—the third element giving the name of the weights for the level 3 groups.</p>
-<p>The <code>WeMix</code> package assumes that the weights are unconditional—as is typical for sample weights found on international surveys such as PISA—but can accept conditional weights by setting the <code>cWeights</code> argument to <code>TRUE</code>.</p>
+<p>Note that the syntax for the model formula is the same syntax one
+would use to specify a model using , except the weights argument. Thus,
+in the random slope and intercept model, the slope and intercept are in
+separate terms to constrain their covariance to be zero. For the weights
+argument, the weights are specified as a vector with the first element
+giving the name of the weights for level 1 units, the second element
+giving the name of the weights for the level 2 groups, and—when fitting
+a model with three levels—the third element giving the name of the
+weights for the level 3 groups.</p>
+<p>The <code>WeMix</code> package assumes that the weights are
+unconditional—as is typical for sample weights found on international
+surveys such as PISA—but can accept conditional weights by setting the
+<code>cWeights</code> argument to <code>TRUE</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="comparison-to-alternate-software">Comparison to Alternate Software<a class="anchor" aria-label="anchor" href="#comparison-to-alternate-software"></a>
 </h2>
-<p>For readers familiar with the specifications of other software, this section shows results compared with those from Stata <code>mixed</code>, Stata GLLAMM, SAS <code>PROC GLIMMIX</code>, HLM, and M+. When possible, the code specifies a random slope model and then a random slope and intercept model with the covariance of slope and intercept fixed to be zero. The models are fitted by maximum likelihood estimation and example code for Stata GLLAMM, Stata <code>mixed</code>, SAS <code>PROC GLIMMIX</code>, HLM, and M+ are shown in Appendix B.</p>
-<p>Table 1 shows the results of the model with a single random effect, where , GLLAMM, Stata <code>mixed</code>, M+, and SAS <code>PROC GLIMMIX</code> show agreement on the likelihood, variance estimates of random effects, and fixed effects. HLM normalizes the weights (for both students and schools), so it estimates a related but different model. All the programs differ in the standard errors estimated for the fixed effects;  most closely matches the results from Stata <code>mixed</code>.</p>
-<p>Table 2 shows the results of the model with two random effects. Here the results are similar. , Stata <code>mixed</code>, M+, and SAS <code>PROC GLIMMIX</code> show agreement on the likelihood, variance term estimates of random effects, and fixed effects. However, in this case, Stata GLLAMM is unable to converge. After 150 iterations of the optimization phase, GLLAMM fails with warning “convergence not achieved.” In HLM, we fit the most similar model we could get the software to fit, but it is not the same, so the results are different. Similar to the one random effect model, Stata <code>mixed</code> reports a lower standard error for the random intercept than most other models. In terms of the standard errors of the fixed effects, differences are evident between the estimates of all the programs;  most closely matches Stata <code>mixed</code>.</p>
+<p>For readers familiar with the specifications of other software, this
+section shows results compared with those from Stata <code>mixed</code>,
+Stata GLLAMM, SAS <code>PROC GLIMMIX</code>, HLM, and M+. When possible,
+the code specifies a random slope model and then a random slope and
+intercept model with the covariance of slope and intercept fixed to be
+zero. The models are fitted by maximum likelihood estimation and example
+code for Stata GLLAMM, Stata <code>mixed</code>, SAS
+<code>PROC GLIMMIX</code>, HLM, and M+ are shown in Appendix B.</p>
+<p>Table 1 shows the results of the model with a single random effect,
+where , GLLAMM, Stata <code>mixed</code>, M+, and SAS
+<code>PROC GLIMMIX</code> show agreement on the likelihood, variance
+estimates of random effects, and fixed effects. HLM normalizes the
+weights (for both students and schools), so it estimates a related but
+different model. All the programs differ in the standard errors
+estimated for the fixed effects; most closely matches the results from
+Stata <code>mixed</code>.</p>
+<p>Table 2 shows the results of the model with two random effects. Here
+the results are similar. , Stata <code>mixed</code>, M+, and SAS
+<code>PROC GLIMMIX</code> show agreement on the likelihood, variance
+term estimates of random effects, and fixed effects. However, in this
+case, Stata GLLAMM is unable to converge. After 150 iterations of the
+optimization phase, GLLAMM fails with warning “convergence not
+achieved.” In HLM, we fit the most similar model we could get the
+software to fit, but it is not the same, so the results are different.
+Similar to the one random effect model, Stata <code>mixed</code> reports
+a lower standard error for the random intercept than most other models.
+In terms of the standard errors of the fixed effects, differences are
+evident between the estimates of all the programs; most closely matches
+Stata <code>mixed</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="mathematical-specification">Mathematical Specification<a class="anchor" aria-label="anchor" href="#mathematical-specification"></a>
 </h2>
-<p><code>WeMix</code> maximizes similar likelihood functions for both linear and nonlinear models.</p>
-<p>The simplest version of this model has two levels and has the form: <span class="math display">\[\begin{equation} \label{eq:basic}
+<p><code>WeMix</code> maximizes similar likelihood functions for both
+linear and nonlinear models.</p>
+<p>The simplest version of this model has two levels and has the form:
+<span class="math display">\[\begin{equation} \label{eq:basic}
 \bm{y} = \bm{X\beta} + \bm{Z u}  + \bm{\epsilon} \ ,
-\end{equation}\]</span> where <span class="math inline">\(\bm{y}\)</span> is the vector of outcomes, <span class="math inline">\(\bm{X}\)</span> is a matrix of covariates associated with regressors that are assumed to be fixed, <span class="math inline">\(\bm{\beta}\)</span> is the vector of fixed-effect regression coefficients, <span class="math inline">\(\bm{Z}\)</span> is a matrix of covariates associated with regressors that are assumed to be random, and <span class="math inline">\(\bm{u}\)</span> is the vector of random effects. The meaning of <span class="math inline">\(\bm{u}\)</span> being random is simply that a level is shared within a group and across groups: <span class="math display">\[\begin{equation}
+\end{equation}\]</span> where <span class="math inline">\(\bm{y}\)</span> is the vector of outcomes, <span class="math inline">\(\bm{X}\)</span> is a matrix of covariates
+associated with regressors that are assumed to be fixed, <span class="math inline">\(\bm{\beta}\)</span> is the vector of fixed-effect
+regression coefficients, <span class="math inline">\(\bm{Z}\)</span> is
+a matrix of covariates associated with regressors that are assumed to be
+random, and <span class="math inline">\(\bm{u}\)</span> is the vector of
+random effects. The meaning of <span class="math inline">\(\bm{u}\)</span> being random is simply that a
+level is shared within a group and across groups: <span class="math display">\[\begin{equation}
 \bm{u} \sim \mathrm{MVN}(\vec{\bm{0}},\bm{\Sigma})
-\end{equation}\]</span> where <span class="math inline">\(\mathrm{MVN}(\vec{\bm{0}},\bm{\Sigma})\)</span> is the multivariate-normal distribution with mean <span class="math inline">\(\vec{\bm{0}}\)</span> (a vector of all zeros), and covariance <span class="math inline">\(\bm{\Sigma}\)</span>.</p>
+\end{equation}\]</span> where <span class="math inline">\(\mathrm{MVN}(\vec{\bm{0}},\bm{\Sigma})\)</span> is
+the multivariate-normal distribution with mean <span class="math inline">\(\vec{\bm{0}}\)</span> (a vector of all zeros), and
+covariance <span class="math inline">\(\bm{\Sigma}\)</span>.</p>
 <div class="section level3">
 <h3 id="hierarchical-linear-models-notation">Hierarchical Linear Models Notation<a class="anchor" aria-label="anchor" href="#hierarchical-linear-models-notation"></a>
 </h3>
-<p>The models  fits also can be called HLMs (Raudenbush &amp; Bryk, 2002) where the first level has the following form: <span class="math display">\[\begin{equation} \label{eq:HLMl1}
-y_{ij} = \beta_{0j} + X\beta_{1j}  + \epsilon_{ij} 
-\end{equation}\]</span> So, the second level could then be, for a random slope and intercept model, as follows: <span class="math display">\[\begin{align} \label{eq:HLMl2}
+<p>The models fits also can be called HLMs (Raudenbush &amp; Bryk, 2002)
+where the first level has the following form: <span class="math display">\[\begin{equation} \label{eq:HLMl1}
+y_{ij} = \beta_{0j} + X\beta_{1j}  + \epsilon_{ij}
+\end{equation}\]</span> So, the second level could then be, for a random
+slope and intercept model, as follows: <span class="math display">\[\begin{align} \label{eq:HLMl2}
 \beta_{0j} &amp;= \gamma_{00} + \delta_{0j} \\
-\beta_{1j} &amp;= \gamma_{01} + \delta_{1j} 
-\end{align}\]</span> where <span class="math inline">\(\delta_{0j}\)</span> and <span class="math inline">\(\delta_{1j}\)</span> are the error terms for the intercept and slope, respectively, and have variances of <span class="math inline">\(\tau_{00}\)</span> and <span class="math inline">\(\tau_{11}\)</span>, respectively, and <span class="math inline">\(\delta_{0j}\)</span> and <span class="math inline">\(\delta_{1j}\)</span> have covariance <span class="math inline">\(\tau_{01}\)</span>.</p>
-<p>This is just one example; many other models also can be fit in . <code>WeMix</code> can fit models that are stated as an HLM or as a mixed model. For notational convenience for the rest of this document, we will use the non-HLM mixed model notation.</p>
+\beta_{1j} &amp;= \gamma_{01} + \delta_{1j}
+\end{align}\]</span> where <span class="math inline">\(\delta_{0j}\)</span> and <span class="math inline">\(\delta_{1j}\)</span> are the error terms for the
+intercept and slope, respectively, and have variances of <span class="math inline">\(\tau_{00}\)</span> and <span class="math inline">\(\tau_{11}\)</span>, respectively, and <span class="math inline">\(\delta_{0j}\)</span> and <span class="math inline">\(\delta_{1j}\)</span> have covariance <span class="math inline">\(\tau_{01}\)</span>.</p>
+<p>This is just one example; many other models also can be fit in .
+<code>WeMix</code> can fit models that are stated as an HLM or as a
+mixed model. For notational convenience for the rest of this document,
+we will use the non-HLM mixed model notation.</p>
 </div>
 <div class="section level3">
 <h3 id="multiple-levels">Multiple Levels<a class="anchor" aria-label="anchor" href="#multiple-levels"></a>
 </h3>
-<p>When there are more than two levels, eq.  can be rewritten as follows: <span class="math display">\[\begin{equation} \label{eq:full}
-\bm{y} = \bm{X\beta} + \sum^L_{l = 2}\bm{Z}^{(l)}\bm{u}^{(l)} + \bm{\epsilon} 
-\end{equation}\]</span> where a superscript <span class="math inline">\((l)\)</span> is added to <span class="math inline">\(\bm{Z}\)</span> and <span class="math inline">\(\bm{u}\)</span> to indicate that they are at the <span class="math inline">\(l\)</span>th level. Note: In the summation, <span class="math inline">\(l\)</span> starts at <span class="math inline">\(l=2\)</span> because random effects cannot be at the lowest level of observation (<span class="math inline">\(l=1\)</span>).</p>
+<p>When there are more than two levels, eq. <span class="math inline">\(\ref{eq:basic}\)</span> can be rewritten as
+follows: <span class="math display">\[\begin{equation} \label{eq:full}
+\bm{y} = \bm{X\beta} + \sum^L_{l = 2}\bm{Z}^{(l)}\bm{u}^{(l)} +
+\bm{\epsilon}
+\end{equation}\]</span> where a superscript <span class="math inline">\((l)\)</span> is added to <span class="math inline">\(\bm{Z}\)</span> and <span class="math inline">\(\bm{u}\)</span> to indicate that they are at the
+<span class="math inline">\(l\)</span>th level. Note: In the summation,
+<span class="math inline">\(l\)</span> starts at <span class="math inline">\(l=2\)</span> because random effects cannot be at
+the lowest level of observation (<span class="math inline">\(l=1\)</span>).</p>
 <p>As of , models with up to three levels are supported.</p>
 </div>
 <div class="section level3">
 <h3 id="cluster-robust-variance-estimation">Cluster-Robust Variance Estimation<a class="anchor" aria-label="anchor" href="#cluster-robust-variance-estimation"></a>
 </h3>
-<p>The variance estimator was calculated following the method of Rabe-Hesketh and Skrondal (2006). Thus, the variance is expressed as follows:</p>
+<p>The variance estimator was calculated following the method of
+Rabe-Hesketh and Skrondal (2006). Thus, the variance is expressed as
+follows:</p>
 <p><span class="math display">\[\begin{equation}
 \mathrm{var}(\bm{u}) = \bm{I^{-1}J I^{-1}}
 \end{equation}\]</span></p>
-<p>where <span class="math inline">\(\bm{I}\)</span> is the observed Fisher information matrix, which is calculated by observing the Fisher information at the maximum likelihood estimates. Given that the likelihood is twice differentiable, we estimate the Fisher information as the second derivative (Hessian) of the log-likelihood evaluated at the maximum likelihood estimate: <span class="math display">\[\begin{equation}
+<p>where <span class="math inline">\(\bm{I}\)</span> is the observed
+Fisher information matrix, which is calculated by observing the Fisher
+information at the maximum likelihood estimates. Given that the
+likelihood is twice differentiable, we estimate the Fisher information
+as the second derivative (Hessian) of the log-likelihood evaluated at
+the maximum likelihood estimate: <span class="math display">\[\begin{equation}
 \bm{I} =  \frac{ \partial^2 \ell }{\partial \theta^2} \label{eq:bigI}
 \end{equation}\]</span></p>
-<p>and <span class="math inline">\(\bm{J}\)</span> is estimated as follows: <span class="math display">\[\begin{equation}
-\bm{J} = \sum_{L}{\frac{n_{L} }{n_{L} -1}} \sum_{j'}{ \frac{ \partial \ell^{L-1}_{j'} } {\partial \theta}
- \cdot  \left[ \frac{ \partial \ell^{L-1}_{j'} } {\partial \theta}\right]^{T}}
+<p>and <span class="math inline">\(\bm{J}\)</span> is estimated as
+follows: <span class="math display">\[\begin{equation}
+\bm{J} = \sum_{L}{\frac{n_{L} }{n_{L} -1}} \sum_{j'}{ \frac{
+\partial \ell^{L-1}_{j'} } {\partial \theta}
+\cdot  \left[ \frac{ \partial \ell^{L-1}_{j'} } {\partial
+\theta}\right]^{T}}
 \end{equation}\]</span></p>
-<p>where <span class="math inline">\(n_{L}\)</span> represents the number of observations in the <span class="math inline">\((L)^{\mathrm{th}}\)</span> level (i.e., the top level), and the subscript <span class="math inline">\(L\)</span> indicates that the outermost sum is over the groups or units <span class="math inline">\(j'\)</span> in the <span class="math inline">\((L-1)^{\mathrm{th}}\)</span> level.</p>
+<p>where <span class="math inline">\(n_{L}\)</span> represents the
+number of observations in the <span class="math inline">\((L)^{\mathrm{th}}\)</span> level (i.e., the top
+level), and the subscript <span class="math inline">\(L\)</span>
+indicates that the outermost sum is over the groups or units <span class="math inline">\(j'\)</span> in the <span class="math inline">\((L-1)^{\mathrm{th}}\)</span> level.</p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="hierarchical-generalized-linear-models">Hierarchical Generalized Linear Models<a class="anchor" aria-label="anchor" href="#hierarchical-generalized-linear-models"></a>
 </h2>
-<p>If data come in a nested structure and the assumptions of linearity and normality cannot be met, even after applying transformations, hierarchical generalized linear models (HGLMs) offer a possible solution. An HGLM model has three components: a sampling model, a link function, and a structural model (Raudenbush &amp; Bryk, 2002). Since  has supported two models: linear models and binomial sampling model with logit link function (for binary outcomes). The binomial models can be specified using the <code>family</code> argument in the <code>mix</code> function. Note that the first model (linear models) is the default, so there is no need to specify the <code>family</code> argument for linear models.</p>
+<p>If data come in a nested structure and the assumptions of linearity
+and normality cannot be met, even after applying transformations,
+hierarchical generalized linear models (HGLMs) offer a possible
+solution. An HGLM model has three components: a sampling model, a link
+function, and a structural model (Raudenbush &amp; Bryk, 2002). Since
+has supported two models: linear models and binomial sampling model with
+logit link function (for binary outcomes). The binomial models can be
+specified using the <code>family</code> argument in the <code>mix</code>
+function. Note that the first model (linear models) is the default, so
+there is no need to specify the <code>family</code> argument for linear
+models.</p>
 <div class="section level3">
 <h3 id="binomial-with-logit-link-function">Binomial With Logit Link Function<a class="anchor" aria-label="anchor" href="#binomial-with-logit-link-function"></a>
 </h3>
-<p>This model is used when the data have binary outcomes (i.e., the number of successes in <em>m</em> trials). Here is an example of code using the <strong>sleepstudy</strong> data set in the  package:</p>
+<p>This model is used when the data have binary outcomes (i.e., the
+number of successes in <em>m</em> trials). Here is an example of code
+using the <strong>sleepstudy</strong> data set in the package:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/lme4/lme4/" class="external-link">lme4</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://american-institutes-for-research.github.io/WeMix/" class="external-link">WeMix</a></span><span class="op">)</span></span>
@@ -221,37 +350,66 @@ y_{ij} = \beta_{0j} + X\beta_{1j}  + \epsilon_{ij}
 <span><span class="va">bi_1</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mix.html">mix</a></span><span class="op">(</span><span class="va">over300</span><span class="op">~</span> <span class="va">Days</span> <span class="op">+</span> <span class="op">(</span><span class="fl">1</span><span class="op">|</span><span class="va">Subject</span><span class="op">)</span>,data<span class="op">=</span><span class="va">ss1</span>,</span>
 <span>            family<span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/stats/family.html" class="external-link">binomial</a></span><span class="op">(</span>link<span class="op">=</span><span class="st">"logit"</span><span class="op">)</span>,verbose<span class="op">=</span><span class="cn">FALSE</span>,</span>
 <span>            weights<span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"W1"</span>, <span class="st">"W2"</span><span class="op">)</span>,nQuad<span class="op">=</span><span class="fl">13</span><span class="op">)</span></span></code></pre></div>
-<p>Table 3 shows the output comparison between <code>WeMix</code> and Stata GLLAMM.</p>
+<p>Table 3 shows the output comparison between <code>WeMix</code> and
+Stata GLLAMM.</p>
 </div>
 </div>
 <div class="section level2">
 <h2 id="weight-adjustments">Weight Adjustments<a class="anchor" aria-label="anchor" href="#weight-adjustments"></a>
 </h2>
-<p> assumes that the weights are already scaled according to the user’s needs. This section describes two common methods that a user may wish to implement.</p>
-<p>The desire to reweight comes from evidence shown by Pfeffermann, Skinner, Holmes, Goldstein, &amp; Rasbash (1998) that reweighting (adjusting the inverse sampling probabilities) can improve the random effect variance estimator in a linear model, especially when the sample of units is small in groups, and from Rabe-Hesketh &amp; Skrondal (2006) wherein even the coefficients can be highly biased in the binomial case when the inverse sampling probabilities are used. Carle (2009) also generally recommends rescaling. All the papers show indications that all methods lead to biased estimates in some cases.</p>
+<p> assumes that the weights are already scaled according to the user’s
+needs. This section describes two common methods that a user may wish to
+implement.</p>
+<p>The desire to reweight comes from evidence shown by Pfeffermann,
+Skinner, Holmes, Goldstein, &amp; Rasbash (1998) that reweighting
+(adjusting the inverse sampling probabilities) can improve the random
+effect variance estimator in a linear model, especially when the sample
+of units is small in groups, and from Rabe-Hesketh &amp; Skrondal (2006)
+wherein even the coefficients can be highly biased in the binomial case
+when the inverse sampling probabilities are used. Carle (2009) also
+generally recommends rescaling. All the papers show indications that all
+methods lead to biased estimates in some cases.</p>
 <p>Method A: <span class="math display">\[\begin{equation}
-w^{*}_{ij} = w_{ij}\left( \frac{n_j}{\sum_i w_{ij}} \right) \ 
-\end{equation}\]</span> where <span class="math inline">\(w_{ij}\)</span> are the full sample weights, <span class="math inline">\(i\)</span> indexes the individuals, <span class="math inline">\(j\)</span> indexes the groups, and <span class="math inline">\(n_j\)</span> represents the number of observations in group <span class="math inline">\(j\)</span>.</p>
+w^{*}_{ij} = w_{ij}\left( \frac{n_j}{\sum_i w_{ij}} \right) \
+\end{equation}\]</span>\end{equation} where <span class="math inline">\(w_{ij}\)</span> are the full sample weights, <span class="math inline">\(i\)</span> indexes the individuals, <span class="math inline">\(j\)</span> indexes the groups, and <span class="math inline">\(n_j\)</span> represents the number of observations
+in group <span class="math inline">\(j\)</span>.</p>
 <p>Method B: <span class="math display">\[\begin{equation}
 w^{*}_{ij} = w_{ij}\left(\frac{\sum_iw_{ij}}{\sum_iw_{ij}^2} \right )
 \end{equation}\]</span></p>
-<p>These <span class="math inline">\(w^*\)</span> are then used to scale the likelihood function.</p>
+<p>These <span class="math inline">\(w^*\)</span> are then used to scale
+the likelihood function.</p>
 </div>
 <div class="section level2">
 <h2 id="centering">Centering<a class="anchor" aria-label="anchor" href="#centering"></a>
 </h2>
-<p>Since version 2,  has allowed users to incorporate grand- or group-mean centering when fitting mixed-effects models. In the group-mean centered model, the predictors are centered on the group-level mean. Compared with eq. , the model can be expressed as follows: <span class="math display">\[\begin{equation} 
-y_{ij} = \beta_{0j} + \beta_{1j}(X_{ij} - \overline{X_{.j}})  + \epsilon_{ij} 
-\end{equation}\]</span> and the intercept can be interpreted as the unadjusted mean for group <em>j</em>: <span class="math display">\[\begin{equation}
+<p>Since version 2, has allowed users to incorporate grand- or
+group-mean centering when fitting mixed-effects models. In the
+group-mean centered model, the predictors are centered on the
+group-level mean. Compared with eq. <span class="math inline">\(\ref{eq:bigI}\)</span>, the model can be expressed
+as follows: <span class="math display">\[\begin{equation}
+y_{ij} = \beta_{0j} + \beta_{1j}(X_{ij} - \overline{X_{.j}})  +
+\epsilon_{ij}
+\end{equation}\]</span> and the intercept can be interpreted as the
+unadjusted mean for group <em>j</em>: <span class="math display">\[\begin{equation}
 \beta_{0j} = \mu_{Y_{j}}
 \end{equation}\]</span></p>
-<p>In the grand-mean centered model, the predictors are centered on the overall mean, so the model can be written as follows: <span class="math display">\[\begin{equation} 
-y_{ij} = \beta_{0j} + \beta_{1j}(X_{ij} - \overline{X_{..}})  + \epsilon_{ij} 
-\end{equation}\]</span> and the intercept can be interpreted as the adjusted mean for group <em>j:</em> <span class="math display">\[\begin{equation}
+<p>In the grand-mean centered model, the predictors are centered on the
+overall mean, so the model can be written as follows: <span class="math display">\[\begin{equation}
+y_{ij} = \beta_{0j} + \beta_{1j}(X_{ij} - \overline{X_{..}})  +
+\epsilon_{ij}
+\end{equation}\]</span> and the intercept can be interpreted as the
+adjusted mean for group <em>j:</em> <span class="math display">\[\begin{equation}
 \beta_{0j} = \mu_{Y_{j}} - \beta_{1j}(X_{ij} - \overline{X_{..}})
 \end{equation}\]</span></p>
-<p>There are two main advantages of centering the predictors. First of all, centering makes estimates of level 1 coefficients (<span class="math inline">\(\beta_{0j}\)</span>) and other effects easier to interpret because it decomposes the relationship between predictors and outcome into within-group and between-group components. Second, it removes high correlations between the random intercept and slopes, as well as high correlations between first- and second-level predictors and cross-level interactions (Kreft &amp; de Leeuw, 1998).</p>
-<p>The following example shows how to implement group- or grand-mean centering:</p>
+<p>There are two main advantages of centering the predictors. First of
+all, centering makes estimates of level 1 coefficients (<span class="math inline">\(\beta_{0j}\)</span>) and other effects easier to
+interpret because it decomposes the relationship between predictors and
+outcome into within-group and between-group components. Second, it
+removes high correlations between the random intercept and slopes, as
+well as high correlations between first- and second-level predictors and
+cross-level interactions (Kreft &amp; de Leeuw, 1998).</p>
+<p>The following example shows how to implement group- or grand-mean
+centering:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/lme4/lme4/" class="external-link">lme4</a></span><span class="op">)</span>  <span class="co">#to use example sleep study data</span></span>
 <span></span>
@@ -271,79 +429,252 @@ y_{ij} = \beta_{0j} + \beta_{1j}(X_{ij} - \overline{X_{..}})  + \epsilon_{ij}
 <div class="section level2">
 <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a>
 </h2>
-<p>Bates, D., Maechler, M., Bolker, B., &amp; Walker, S. (2015). Fitting linear mixed-effects models using lme4. <em>Journal of Statistical Software</em>, <em>67</em>(1), 1–48.</p>
-<p>Carle, A. C. (2009). Fitting multilevel models in complex survey data with design weights: Recommendations. <em>BMC Medical Research Methodology</em>, <em>9</em>(1), 1–13.</p>
-<p>Hartzel, J., Agresti, A., &amp; Caffo, B. (2001). Multinomial logit random effects models. <em>Statistical Modelling: An International Journal</em>, <em>1</em>(2), 81–102.</p>
-<p>Kreft, I. G., &amp; de Leeuw, J. (1998). <em>Introducing statistical methods: Introducing multilevel modeling</em>. London, UK: SAGE</p>
-<p>Liu, Q., &amp; Pierce, D. A. (1994). A note on Gauss-Hermite quadrature. <em>Biometrika</em>, <em>81</em>(3), 624.</p>
-<p>Organisation for Economic Co-operation and Development. (2013). <em>PISA 2012 assessment and analytical framework: Mathematics, reading, science, problem solving and financial literacy</em>. Paris, France: OECD Publishing. Retrieved from <a href="http://www.oecd.org/pisa/pisaproducts/PISA%202012%20framework%20e-book_final.pdf" class="external-link uri">http://www.oecd.org/pisa/pisaproducts/PISA%202012%20framework%20e-book_final.pdf</a></p>
-<p>Pfeffermann, D., Skinner, C., Holmes, D., Goldstein, H., &amp; Rasbash, J. (1998). Weighting for unequal selection probabilities in multilevel models. <em>Journal of the Royal Statistical Society</em>. Series B (Statistical Methodology), <em>60</em>(1), 23–40.</p>
-<p>Rabe-Hesketh, S., &amp; Skrondal, A. (2006). Multilevel modelling of complex survey data. <em>Journal of the Royal Statistical Society</em>. Series A (Statistics in Society), <em>169</em>(4), 805–827.</p>
-<p>Rabe-Hesketh, S., Skrondal, A., &amp; Pickles, A. (2002). Reliable estimation of generalized linear mixed models using adaptive quadrature. <em>Stata Journal</em>, 2, 1–21.</p>
-<p>Rabe-Hesketh, S., Skrondal, A., &amp; Pickles, A. (2004). <em>GLLAMM manual</em> (Working Paper No. 160). Berkeley, CA: University of California–Berkeley, Division of Biostatistics.</p>
-<p>Rabe-Hesketh, S., Skrondal, A., &amp; Pickles, A. (2005). Maximum likelihood estimation of limited and discrete dependent variable models with nested random effects. <em>Journal of Econometrics</em>. <em>128</em>(2), 301–323.</p>
-<p>Raudenbush, S. W., &amp; Bryk, A. S. (2002). <em>Hierarchical linear models: Applications and data analysis methods</em> (2nd ed.). Thousand Oaks, CA: SAGE.</p>
-<p>Raudenbush, S. W., Bryk, A. S., Cheong, Y. F., Congdon, R. T., &amp; Toit, M. (2016). <em>HLM7 hierarchical linear and nonlinear modeling user manual: User guide for Scientific Software International’s (S.S.I.) Program</em>. Lincolnwood, IL: Scientific Software International.</p>
-<p>SAS Institute Inc. (2013). <em>SAS/ACCESS 9.4 interface to ADABAS: Reference</em>. Cary, NC: Author.</p>
-<p>Smyth, G. K. (1998). Numerical integration. In P. Armitage &amp; T. Colton (Eds.), <em>Encyclopedia of biostatistics</em> (pp. 3088–3095). London, UK: Wiley.</p>
-<p>StataCorp. (2015). <em>Stata statistical software: Release 14</em>. College Station, TX: Author.</p>
+<p>Bates, D., Maechler, M., Bolker, B., &amp; Walker, S. (2015). Fitting
+linear mixed-effects models using lme4. <em>Journal of Statistical
+Software</em>, <em>67</em>(1), 1–48.</p>
+<p>Carle, A. C. (2009). Fitting multilevel models in complex survey data
+with design weights: Recommendations. <em>BMC Medical Research
+Methodology</em>, <em>9</em>(1), 1–13.</p>
+<p>Hartzel, J., Agresti, A., &amp; Caffo, B. (2001). Multinomial logit
+random effects models. <em>Statistical Modelling: An International
+Journal</em>, <em>1</em>(2), 81–102.</p>
+<p>Kreft, I. G., &amp; de Leeuw, J. (1998). <em>Introducing statistical
+methods: Introducing multilevel modeling</em>. London, UK: SAGE</p>
+<p>Liu, Q., &amp; Pierce, D. A. (1994). A note on Gauss-Hermite
+quadrature. <em>Biometrika</em>, <em>81</em>(3), 624.</p>
+<p>Organisation for Economic Co-operation and Development. (2013).
+<em>PISA 2012 assessment and analytical framework: Mathematics, reading,
+science, problem solving and financial literacy</em>. Paris, France:
+OECD Publishing. Retrieved from <a href="http://www.oecd.org/pisa/pisaproducts/PISA%202012%20framework%20e-book_final.pdf" class="external-link uri">http://www.oecd.org/pisa/pisaproducts/PISA%202012%20framework%20e-book_final.pdf</a></p>
+<p>Pfeffermann, D., Skinner, C., Holmes, D., Goldstein, H., &amp;
+Rasbash, J. (1998). Weighting for unequal selection probabilities in
+multilevel models. <em>Journal of the Royal Statistical Society</em>.
+Series B (Statistical Methodology), <em>60</em>(1), 23–40.</p>
+<p>Rabe-Hesketh, S., &amp; Skrondal, A. (2006). Multilevel modelling of
+complex survey data. <em>Journal of the Royal Statistical Society</em>.
+Series A (Statistics in Society), <em>169</em>(4), 805–827.</p>
+<p>Rabe-Hesketh, S., Skrondal, A., &amp; Pickles, A. (2002). Reliable
+estimation of generalized linear mixed models using adaptive quadrature.
+<em>Stata Journal</em>, 2, 1–21.</p>
+<p>Rabe-Hesketh, S., Skrondal, A., &amp; Pickles, A. (2004). <em>GLLAMM
+manual</em> (Working Paper No. 160). Berkeley, CA: University of
+California–Berkeley, Division of Biostatistics.</p>
+<p>Rabe-Hesketh, S., Skrondal, A., &amp; Pickles, A. (2005). Maximum
+likelihood estimation of limited and discrete dependent variable models
+with nested random effects. <em>Journal of Econometrics</em>.
+<em>128</em>(2), 301–323.</p>
+<p>Raudenbush, S. W., &amp; Bryk, A. S. (2002). <em>Hierarchical linear
+models: Applications and data analysis methods</em> (2nd ed.). Thousand
+Oaks, CA: SAGE.</p>
+<p>Raudenbush, S. W., Bryk, A. S., Cheong, Y. F., Congdon, R. T., &amp;
+Toit, M. (2016). <em>HLM7 hierarchical linear and nonlinear modeling
+user manual: User guide for Scientific Software International’s (S.S.I.)
+Program</em>. Lincolnwood, IL: Scientific Software International.</p>
+<p>SAS Institute Inc. (2013). <em>SAS/ACCESS 9.4 interface to ADABAS:
+Reference</em>. Cary, NC: Author.</p>
+<p>Smyth, G. K. (1998). Numerical integration. In P. Armitage &amp; T.
+Colton (Eds.), <em>Encyclopedia of biostatistics</em> (pp. 3088–3095).
+London, UK: Wiley.</p>
+<p>StataCorp. (2015). <em>Stata statistical software: Release 14</em>.
+College Station, TX: Author.</p>
 </div>
 <div class="section level2">
 <h2 id="appendix-a--binomial-model-fitting">Appendix A. Binomial Model Fitting<a class="anchor" aria-label="anchor" href="#appendix-a--binomial-model-fitting"></a>
 </h2>
-<p>The central concern in  is properly incorporating sampling weights into the mixed model. Because each individual or group may have an unequal probability of selection into the sample, the estimate of the distribution of the multivariate normal must include those weights to correctly estimate the parameters of the distribution. Also, except for trivial cases, the nested nature of the multilevel model creates a likelihood function that is not analytically calculable.</p>
-<p>We consider the likelihood as a summation at each level, starting with the lowest (unit) level. The likelihood is conditional on the random effects at each higher level and is scaled by the weights at the lowest level.</p>
-<p>In the case of the normal distribution, the likelihood (<span class="math inline">\(\mathcal{L}^{(1)}\)</span>) at the individual unit level is given by the equations that follow. Note that here the subscript <span class="math inline">\(i\)</span> is used to indicate that this is the likelihood of the <span class="math inline">\(i^{\mathrm{th}}\)</span> individual. <span class="math display">\[\begin{equation}
-\mathcal{L}_i^{(1)}(\bm{\theta};\bm{y},\bm{U}^{(l)},\bm{X},\bm{Z},\bm{W}) = \frac{1}{\Sigma^{(1)}} \phi \left(  \frac{\hat{ e_i } }{\Sigma^{(1)}}   \right) \\
-\end{equation}\]</span> where <span class="math inline">\(\phi(\cdot)\)</span> is the standard normal density function, and <span class="math inline">\(\Sigma^{(1)}\)</span> is the residual variance (a scalar). The residuals vector <span class="math inline">\(\hat{\bm{e}}\)</span> represents the residuals <span class="math inline">\(\hat{e}_i\)</span> for each individual, which is calculated as follows: <span class="math display">\[\begin{equation}
-\hat {\bm{e}} = \bm{y} - \bm{X}\hat{\bm{\beta}} - \sum_{l=2}^L \bm{Z}^{(l)}\hat{\bm{u}}^{(l)}  \
-\end{equation}\]</span></p>
-<p>The conditional likelihood given the vector <span class="math inline">\(\bm{U}^{(l+1)}\)</span> of random effects at the <span class="math inline">\(l+1\)</span> level and higher is then recursively defined, for the <span class="math inline">\(j\)</span>th unit, at level <span class="math inline">\(l\)</span> (<span class="math inline">\(\mathcal{L}^{(l)}_j\)</span>; Rabe-Hesketh et al. 2002, eq. 3):<br><span class="math display">\[\begin{equation}
-\mathcal{L}^{(l)}_j(\bm{\theta}; \bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{U}^{(l+1)}) = \int_{-\infty}^{\infty} ... \int_{-\infty}^{\infty} g^{(l)}(\bm{u}^{(l)})\prod_{j'}{ \bigg[\mathcal{L}^{(l-1)}_{j'}(\bm{\theta} ; \bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{U}^{(l)})\bigg]^{\bm{w}^{(l-1)}_{j'}}} du_1^{(l)} ... du_{k_l}^{(l)} \label{eq:bigL}
-\end{equation}\]</span> where the subscript <span class="math inline">\(j'\)</span> that the product is indexed over indicates that the likelihood <span class="math inline">\(\mathcal{L}^{(l-1)}_{j'}\)</span> is for the units of level <span class="math inline">\(l-1\)</span> nested in unit <span class="math inline">\(j\)</span>. In addition, <span class="math inline">\(g(\bm{u}^{(l)})\)</span> is the empirical Bayes “prior” probability density of the random effects (at level <span class="math inline">\(l\)</span>) having a value of <span class="math inline">\(u^{(l)}\)</span>, so <span class="math inline">\(g(\bm{0}, \bm{\Sigma})\)</span> is a multivariate normal distribution parameterized by a mean of <span class="math inline">\(\bm{0}\)</span> and variance <span class="math inline">\(\bm{\Sigma}\)</span>. The integrals are over the elements of <span class="math inline">\(\bm{u}=( u_1, ..., u_{k_l})\)</span>, where <span class="math inline">\(k_l\)</span> is the number of random effects at level <span class="math inline">\(l\)</span>. It is important to note that each <span class="math inline">\(\mathcal{L}^{(l)}\)</span> is independent for each <span class="math inline">\(j'\)</span>. This allows us to integrate out the values of <span class="math inline">\(u\)</span> for all groups simultaneously, which leaves us with a <span class="math inline">\(k_l\)</span> dimensional integral and is essential to making this problem computationally feasible. At the highest level, the result is not conditional on any <span class="math inline">\(\bm{u}\)</span> values but is otherwise the same.</p>
-<p>For ease of computation and to avoid problems with accurate storage of extremely small numbers, we first take the log of the function before maximizing. Following Rabe-Hesketh &amp; Skrondal (2006, eq. 1), the log-likelihood function is as follows: <span class="math display">\[\begin{equation}
-\ell^{(l)}_j(\bm{\theta} ; \bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{U}^{(l+1)}) = \ln \left\{ \int ... \int {g^{(l-1)}(u^{(l-1)}) \cdot \exp \left[ \sum_{j'}{\bm{w}^{(l-1)}_{j'} \ell^{(l-l)}_{j'}(\bm{\theta} ; \bm{y},\bm{X}, \bm{Z},\bm{W}| U^{(l)}) } \right] du_1^{(l)} ... du_{k_l}^{(l)}} \right\}
-\end{equation}\]</span> where <span class="math inline">\(\ell^{(l)}_j\)</span> is the log-likelihood function for the <span class="math inline">\(j\)</span>th unit at level <span class="math inline">\(l\)</span>.</p>
+<p>The central concern in is properly incorporating sampling weights
+into the mixed model. Because each individual or group may have an
+unequal probability of selection into the sample, the estimate of the
+distribution of the multivariate normal must include those weights to
+correctly estimate the parameters of the distribution. Also, except for
+trivial cases, the nested nature of the multilevel model creates a
+likelihood function that is not analytically calculable.</p>
+<p>We consider the likelihood as a summation at each level, starting
+with the lowest (unit) level. The likelihood is conditional on the
+random effects at each higher level and is scaled by the weights at the
+lowest level.</p>
+<p>In the case of the normal distribution, the likelihood (<span class="math inline">\(\mathcal{L}^{(1)}\)</span>) at the individual unit
+level is given by the equations that follow. Note that here the
+subscript <span class="math inline">\(i\)</span> is used to indicate
+that this is the likelihood of the <span class="math inline">\(i^{\mathrm{th}}\)</span> individual. <span class="math display">\[\begin{equation}
+\mathcal{L}_i^{(1)}(\bm{\theta};\bm{y},\bm{U}^{(l)},\bm{X},\bm{Z},\bm{W})
+= \frac{1}{\Sigma^{(1)}} \phi \left(  \frac{\hat{ e_i }
+}{\Sigma^{(1)}}   \right) \\
+\end{equation}\]</span> where <span class="math inline">\(\phi(\cdot)\)</span> is the standard normal
+density function, and <span class="math inline">\(\Sigma^{(1)}\)</span>
+is the residual variance (a scalar). The residuals vector <span class="math inline">\(\hat{\bm{e}}\)</span> represents the residuals
+<span class="math inline">\(\hat{e}_i\)</span> for each individual,
+which is calculated as follows: <span class="math display">\[\begin{equation}
+\hat {\bm{e}} = \bm{y} - \bm{X}\hat{\bm{\beta}} - \sum_{l=2}^L
+\bm{Z}^{(l)}\hat{\bm{u}}^{(l)}  \
+\end{equation}\]</span>\end{equation}</p>
+<p>The conditional likelihood given the vector <span class="math inline">\(\bm{U}^{(l+1)}\)</span> of random effects at the
+<span class="math inline">\(l+1\)</span> level and higher is then
+recursively defined, for the <span class="math inline">\(j\)</span>th
+unit, at level <span class="math inline">\(l\)</span> (<span class="math inline">\(\mathcal{L}^{(l)}_j\)</span>; Rabe-Hesketh et
+al. 2002, eq. 3):<br><span class="math display">\[\begin{equation}
+\mathcal{L}^{(l)}_j(\bm{\theta}; \bm{y},\bm{X}, \bm{Z},\bm{W}|
+\bm{U}^{(l+1)}) = \int_{-\infty}^{\infty} ... \int_{-\infty}^{\infty}
+g^{(l)}(\bm{u}^{(l)})\prod_{j'}{
+\bigg[\mathcal{L}^{(l-1)}_{j'}(\bm{\theta} ; \bm{y},\bm{X},
+\bm{Z},\bm{W}| \bm{U}^{(l)})\bigg]^{\bm{w}^{(l-1)}_{j'}}} du_1^{(l)}
+... du_{k_l}^{(l)} \label{eq:bigL}
+\end{equation}\]</span> where the subscript <span class="math inline">\(j'\)</span> that the product is indexed over
+indicates that the likelihood <span class="math inline">\(\mathcal{L}^{(l-1)}_{j'}\)</span> is for the
+units of level <span class="math inline">\(l-1\)</span> nested in unit
+<span class="math inline">\(j\)</span>. In addition, <span class="math inline">\(g(\bm{u}^{(l)})\)</span> is the empirical Bayes
+“prior” probability density of the random effects (at level <span class="math inline">\(l\)</span>) having a value of <span class="math inline">\(u^{(l)}\)</span>, so <span class="math inline">\(g(\bm{0}, \bm{\Sigma})\)</span> is a multivariate
+normal distribution parameterized by a mean of <span class="math inline">\(\bm{0}\)</span> and variance <span class="math inline">\(\bm{\Sigma}\)</span>. The integrals are over the
+elements of <span class="math inline">\(\bm{u}=( u_1, ...,
+u_{k_l})\)</span>, where <span class="math inline">\(k_l\)</span> is the
+number of random effects at level <span class="math inline">\(l\)</span>. It is important to note that each
+<span class="math inline">\(\mathcal{L}^{(l)}\)</span> is independent
+for each <span class="math inline">\(j'\)</span>. This allows us to
+integrate out the values of <span class="math inline">\(u\)</span> for
+all groups simultaneously, which leaves us with a <span class="math inline">\(k_l\)</span> dimensional integral and is essential
+to making this problem computationally feasible. At the highest level,
+the result is not conditional on any <span class="math inline">\(\bm{u}\)</span> values but is otherwise the
+same.</p>
+<p>For ease of computation and to avoid problems with accurate storage
+of extremely small numbers, we first take the log of the function before
+maximizing. Following Rabe-Hesketh &amp; Skrondal (2006, eq. 1), the
+log-likelihood function is as follows: <span class="math display">\[\begin{equation}
+\ell^{(l)}_j(\bm{\theta} ; \bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{U}^{(l+1)})
+= \ln \left\{ \int ... \int {g^{(l-1)}(u^{(l-1)}) \cdot \exp \left[
+\sum_{j'}{\bm{w}^{(l-1)}_{j'} \ell^{(l-l)}_{j'}(\bm{\theta}
+; \bm{y},\bm{X}, \bm{Z},\bm{W}| U^{(l)}) } \right] du_1^{(l)} ...
+du_{k_l}^{(l)}} \right\}
+\end{equation}\]</span> where <span class="math inline">\(\ell^{(l)}_j\)</span> is the log-likelihood
+function for the <span class="math inline">\(j\)</span>th unit at level
+<span class="math inline">\(l\)</span>.</p>
 <div class="section level3">
 <h3 id="adaptive-gauss-hermite-quadrature">Adaptive Gauss-Hermite Quadrature<a class="anchor" aria-label="anchor" href="#adaptive-gauss-hermite-quadrature"></a>
 </h3>
-<p>Unfortunately, in the nonlinear case, there is no closed-form expression for the integral in eq. , and so we must evaluate the likelihood numerically. This is possible with adaptive Gauss-Hermite quadrature, which is a modification of Gauss-Hermite quadrature.</p>
-<p>First, to evaluate the integral at level <span class="math inline">\(l\)</span>, we must evaluate the integral over <span class="math inline">\(k_l\)</span> random effects variables that have a covariance matrix <span class="math inline">\(\bm{\Sigma}^{(l)}\)</span>. To avoid dependence, we use a change of variables to create independent and standard normal distributed vectors <span class="math inline">\(v^{(l)}\)</span>. Using the Cholesky decomposition <span class="math inline">\(\bm{\Sigma}^{(l)}=\bm{C}^{(l)} \left( \bm{C}^{(l)} \right)^T\)</span>, the value of <span class="math inline">\(u^{(l)}\)</span> can then be calculated as <span class="math inline">\(u^{(l)} = \bm{C}^{(l)} \bm{v}^{(l)}\)</span>.</p>
-<p>For nonlinear models, we use the transformation of variables previously described above: <span class="math display">\[\begin{align}
-\ell^{(l)}_j &amp; = \int...\int{g^{(l)}}(u^{(l)}) \cdot \exp \left[ \sum_{j'}{{\bm{w}^{(l-1)}_{j'} \ell^{(l-l)}_{j'}(\bm{\theta} ; \bm{y},\bm{X}, \bm{Z},\bm{W}| U^{(l)}) }} \right ] du^{(l)} \\
-&amp;= \int\phi(v_{k_l}^{(l)})...\int\phi(v_{1}^{(l)}) \cdot \exp \left[\sum_{j'}{{\bm{w}^{(l-1)}_{j'} \ell^{(l-l)}_{j'}(\bm{\theta} ; \bm{y},\bm{X}, \bm{Z},\bm{W}| U^{(l)}) }} \right ] du^{(l)} \label{eq:lnlv}
-\end{align}\]</span> where <span class="math inline">\(u^{(l)}\)</span> is now a function of the <span class="math inline">\(v\)</span> values and <span class="math inline">\(\phi\)</span> is the standard normal density.</p>
-<p>Quadrature replaces integration with a summation over a finite set of points (known as quadrature points) and weights so that the sum approximates the integral. We annotate the quadrature points with a tilde so that, for example, <span class="math inline">\(u\)</span> becomes <span class="math inline">\(\tilde u\)</span>.</p>
-<p>These equations come from Rabe-Hesketh et al. (2002, p. 5, eq. 4) and follow from eq. .</p>
+<p>Unfortunately, in the nonlinear case, there is no closed-form
+expression for the integral in eq. <span class="math inline">\(\ref{eq:bigL}\)</span>, and so we must evaluate
+the likelihood numerically. This is possible with adaptive Gauss-Hermite
+quadrature, which is a modification of Gauss-Hermite quadrature.</p>
+<p>First, to evaluate the integral at level <span class="math inline">\(l\)</span>, we must evaluate the integral over
+<span class="math inline">\(k_l\)</span> random effects variables that
+have a covariance matrix <span class="math inline">\(\bm{\Sigma}^{(l)}\)</span>. To avoid dependence,
+we use a change of variables to create independent and standard normal
+distributed vectors <span class="math inline">\(v^{(l)}\)</span>. Using
+the Cholesky decomposition <span class="math inline">\(\bm{\Sigma}^{(l)}=\bm{C}^{(l)} \left( \bm{C}^{(l)}
+\right)^T\)</span>, the value of <span class="math inline">\(u^{(l)}\)</span> can then be calculated as <span class="math inline">\(u^{(l)} = \bm{C}^{(l)} \bm{v}^{(l)}\)</span>.</p>
+<p>For nonlinear models, we use the transformation of variables
+previously described above: <span class="math display">\[\begin{align}
+\ell^{(l)}_j &amp; = \int...\int{g^{(l)}}(u^{(l)}) \cdot \exp \left[
+\sum_{j'}{{\bm{w}^{(l-1)}_{j'} \ell^{(l-l)}_{j'}(\bm{\theta}
+; \bm{y},\bm{X}, \bm{Z},\bm{W}| U^{(l)}) }} \right ] du^{(l)} \\
+&amp;= \int\phi(v_{k_l}^{(l)})...\int\phi(v_{1}^{(l)}) \cdot \exp
+\left[\sum_{j'}{{\bm{w}^{(l-1)}_{j'}
+\ell^{(l-l)}_{j'}(\bm{\theta} ; \bm{y},\bm{X}, \bm{Z},\bm{W}|
+U^{(l)}) }} \right ] du^{(l)} \label{eq:lnlv}
+\end{align}\]</span> where <span class="math inline">\(u^{(l)}\)</span>
+is now a function of the <span class="math inline">\(v\)</span> values
+and <span class="math inline">\(\phi\)</span> is the standard normal
+density.</p>
+<p>Quadrature replaces integration with a summation over a finite set of
+points (known as quadrature points) and weights so that the sum
+approximates the integral. We annotate the quadrature points with a
+tilde so that, for example, <span class="math inline">\(u\)</span>
+becomes <span class="math inline">\(\tilde u\)</span>.</p>
+<p>These equations come from Rabe-Hesketh et al. (2002, p. 5, eq. 4) and
+follow from eq. <span class="math inline">\(\ref{eq:lnlv}\)</span>.</p>
 <p><span class="math display">\[\begin{equation}
-\ell^{(l)}_j(\bm{\theta} ; \bm{y},\bm{X},\bm{Z},\bm{W}|\bm{U}^{(l+1)})) \approx \\ \sum_{r_1=1}^Rp_{r_1}^{(l)}...\sum_{r_{k_l}=1}^{R} p_{r_{k_l}}^{(l)} \cdot \exp \left[ \sum_{j'}{\bm{w}^{(l-1)}_{j'} \ell^{(l-l)}_{j'}(\bm{\theta} ; \bm{y},\bm{X},\bm{Z},\bm{W}|\tilde{\bm{u}}^{(l)}, \bm{U}^{(l+1)})} \right ]
-\end{equation}\]</span> where <span class="math inline">\(R\)</span> is the number of quadrature points, <span class="math inline">\(\bm{p}\)</span> are the quadrature weights, and <span class="math inline">\(\tilde{\bm{u}}^{(l)}= C^{(l)} \tilde{\bm{v}}^{(l)}\)</span> are the quadrature point locations for each random effect vector. This results in a grid with <span class="math inline">\(R\)</span> quadrature points per element in <span class="math inline">\(u\)</span> (and <span class="math inline">\(v\)</span>), for a total of <span class="math inline">\(R^{k_l}\)</span> quadrature points, and the summation is over every point in that grid. The quadrature points and weights come from the  implementation of Gaussian quadrature in  (Smyth 1998).</p>
-<p>Although Gauss-Hermite quadrature centers the quadrature points on the prior distribution, adaptive Gauss-Hermite quadrature (AGHQ) centers the quadrature points on either the likelihood surface or the posterior distribution. We use the posterior maximum, the likelihood function of which, including <span class="math inline">\(g(\cdot)\)</span>, is detailed next, but this section is general to AGHQ as detailed in Lui and Pierce (1994) and Hartzel, Agresti, and Caffo (2001); we use notation similar to Hartzel et al. (2001, p. 87). The goal of adaptive quadrature is to reduce the number of quadrature points needed for an accurate evaluation of the integral by centering the points closer to the bulk of the integral. The location of the points is scaled based on the values of the likelihood function. To do this, the mode of the likelihood is used to center the points, and the dispersion is the estimated standard deviation of the likelihood at that point (using the inverse second derivative): <span class="math display">\[\begin{equation}
-\tilde{\bm{u}} = \hat{\bm{\omega}}_j+\sqrt 2 \hat{\bm{Q}}^{1/2}_j \tilde{\bm{v}}
-\end{equation}\]</span> where <span class="math inline">\(\tilde{\bm{u}}_i^{(l)}\)</span> are the quadrature points, <span class="math inline">\(\hat{\bm{\omega}}_i\)</span> is a vector of locations for group <span class="math inline">\(j\)</span>, and <span class="math inline">\(\hat{\bm{Q}}_j\)</span> is the matrix that is the inverse numerical second derivative of the likelihood function evaluated at the unit normal <span class="math inline">\(iid\)</span> points <span class="math inline">\(\bm{v}\)</span>.</p>
-<p>We can then use the adapted quadrature points to calculate the log likelihood as follows: <span class="math display">\[\begin{equation}
+\ell^{(l)}_j(\bm{\theta} ; \bm{y},\bm{X},\bm{Z},\bm{W}|\bm{U}^{(l+1)}))
+\approx \\ \sum_{r_1=1}^Rp_{r_1}^{(l)}...\sum_{r_{k_l}=1}^{R}
+p_{r_{k_l}}^{(l)} \cdot \exp \left[
+\sum_{j'}{\bm{w}^{(l-1)}_{j'} \ell^{(l-l)}_{j'}(\bm{\theta}
+; \bm{y},\bm{X},\bm{Z},\bm{W}|\tilde{\bm{u}}^{(l)}, \bm{U}^{(l+1)})}
+\right ]
+\end{equation}\]</span> where <span class="math inline">\(R\)</span> is
+the number of quadrature points, <span class="math inline">\(\bm{p}\)</span> are the quadrature weights, and
+<span class="math inline">\(\tilde{\bm{u}}^{(l)}= C^{(l)}
+\tilde{\bm{v}}^{(l)}\)</span> are the quadrature point locations for
+each random effect vector. This results in a grid with <span class="math inline">\(R\)</span> quadrature points per element in <span class="math inline">\(u\)</span> (and <span class="math inline">\(v\)</span>), for a total of <span class="math inline">\(R^{k_l}\)</span> quadrature points, and the
+summation is over every point in that grid. The quadrature points and
+weights come from the implementation of Gaussian quadrature in (Smyth
+1998).</p>
+<p>Although Gauss-Hermite quadrature centers the quadrature points on
+the prior distribution, adaptive Gauss-Hermite quadrature (AGHQ) centers
+the quadrature points on either the likelihood surface or the posterior
+distribution. We use the posterior maximum, the likelihood function of
+which, including <span class="math inline">\(g(\cdot)\)</span>, is
+detailed next, but this section is general to AGHQ as detailed in Lui
+and Pierce (1994) and Hartzel, Agresti, and Caffo (2001); we use
+notation similar to Hartzel et al. (2001, p. 87). The goal of adaptive
+quadrature is to reduce the number of quadrature points needed for an
+accurate evaluation of the integral by centering the points closer to
+the bulk of the integral. The location of the points is scaled based on
+the values of the likelihood function. To do this, the mode of the
+likelihood is used to center the points, and the dispersion is the
+estimated standard deviation of the likelihood at that point (using the
+inverse second derivative): <span class="math display">\[\begin{equation}
+\tilde{\bm{u}} = \hat{\bm{\omega}}_j+\sqrt 2 \hat{\bm{Q}}^{1/2}_j
+\tilde{\bm{v}}
+\end{equation}\]</span> where <span class="math inline">\(\tilde{\bm{u}}_i^{(l)}\)</span> are the quadrature
+points, <span class="math inline">\(\hat{\bm{\omega}}_i\)</span> is a
+vector of locations for group <span class="math inline">\(j\)</span>,
+and <span class="math inline">\(\hat{\bm{Q}}_j\)</span> is the matrix
+that is the inverse numerical second derivative of the likelihood
+function evaluated at the unit normal <span class="math inline">\(iid\)</span> points <span class="math inline">\(\bm{v}\)</span>.</p>
+<p>We can then use the adapted quadrature points to calculate the log
+likelihood as follows: <span class="math display">\[\begin{equation}
 \begin{aligned}
 \ell^{(l)}_j (\bm{\theta} ; \bm{y},\bm{X}, \bm{Z},\bm{W}|
 \bm{U}^{(l+1)}) \approx \\
- \sum_{r_1=1}^R p_{r_1}^{(l)} ... \sum_{r_{k_l}=1}^{R} p_{r_{k_l}}^{(l)}  \cdot \exp \left[  \sum_{j'}{\bm{w}^{(l-1)}_{j'} \ell^{(l-1)}_{j'}(\bm{\theta} ; \bm{y},\bm{X} \bm{Z},\bm{W}|\tilde u_{r_1} ... \tilde u_{r_{k_l}}, \bm{U}^{(l+1)})}+g(\tilde{\bm{u}}^{(l)};\bm{\Sigma}^{(l)})+ \bm{v}^T \bm{v} \right]
+\sum_{r_1=1}^R p_{r_1}^{(l)} ... \sum_{r_{k_l}=1}^{R}
+p_{r_{k_l}}^{(l)}  \cdot \exp
+\left[  \sum_{j'}{\bm{w}^{(l-1)}_{j'}
+\ell^{(l-1)}_{j'}(\bm{\theta} ; \bm{y},\bm{X} \bm{Z},\bm{W}|\tilde
+u_{r_1} ... \tilde u_{r_{k_l}},
+\bm{U}^{(l+1)})}+g(\tilde{\bm{u}}^{(l)};\bm{\Sigma}^{(l)})+ \bm{v}^T
+\bm{v} \right]
 \end{aligned}
-\end{equation}\]</span> This approximation of the likelihood can then be evaluated and minimized numerically. In this package, we minimize the function using Newton’s method.</p>
+\end{equation}\]</span> This approximation of the likelihood can then be
+evaluated and minimized numerically. In this package, we minimize the
+function using Newton’s method.</p>
 <div class="section level4">
 <h4 id="calculation-of-conditional-mode">Calculation of Conditional Mode<a class="anchor" aria-label="anchor" href="#calculation-of-conditional-mode"></a>
 </h4>
-<p>AGHQ requires an estimated location (<span class="math inline">\(\bm{\hat \omega}_j\)</span>) and variance (<span class="math inline">\(\bm{Q}_j\)</span>) for each group. These are calculated by iteratively finding the conditional mode of the random effects (to find <span class="math inline">\(\bm{\hat \omega}_j\)</span>) and then using the inverse of the second derivative of the likelihood surface as an estimate of <span class="math inline">\(\bm{Q}_j\)</span>.</p>
-<p>The conditional modes are identified by sequentially increasing the levels of <span class="math inline">\(l\)</span>; the software first identifies the conditional mode at level 2 and then, using those estimates, uses AGHQ at level 2 to estimate conditional modes at level 3, and so on.</p>
-<p>For each group, the conditional mode is identified using Newton’s method on the likelihood for that unit (<span class="math inline">\(\ell^{(l)}_j\)</span>) at a particular level of <span class="math inline">\(u^{(l)}\)</span>, called <span class="math inline">\(\hat{u}\)</span>, and conditional on an existing estimate of <span class="math inline">\(\theta\)</span>, <span class="math display">\[\begin{equation}
-\ell^{(l)}_j(\hat{\bm{u}}^{(l)}; \bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{\theta}) = \ln \left[ {g^{(l)}(\hat{\bm{u}}^{(l)})\sum_{j'} {\bm{w}^{(l-1)}_{j'} \ell^{(l-1)}_{j'} (\bm{\theta} ; \bm{y}, \bm{X}, \bm{Z},\bm{W}| \hat{\bm{u}}^{(l)}) }} \right] \label{eq:map}
-\end{equation}\]</span> where this formulation implicitly sets all values of <span class="math inline">\(\bm{U}^{(l)}\)</span> to zero. Note that the values of <span class="math inline">\(\ell^{(l-l)}_{j'}\)</span> still integrate out the values of <span class="math inline">\(\bm{u}\)</span> for all levels below <span class="math inline">\(l\)</span>.</p>
-<p>Newton’s method requires a first and second derivative, and these are calculated with numerical derivatives of the likelihood calculated using numerical quadrature.</p>
+<p>AGHQ requires an estimated location (<span class="math inline">\(\bm{\hat \omega}_j\)</span>) and variance (<span class="math inline">\(\bm{Q}_j\)</span>) for each group. These are
+calculated by iteratively finding the conditional mode of the random
+effects (to find <span class="math inline">\(\bm{\hat
+\omega}_j\)</span>) and then using the inverse of the second derivative
+of the likelihood surface as an estimate of <span class="math inline">\(\bm{Q}_j\)</span>.</p>
+<p>The conditional modes are identified by sequentially increasing the
+levels of <span class="math inline">\(l\)</span>; the software first
+identifies the conditional mode at level 2 and then, using those
+estimates, uses AGHQ at level 2 to estimate conditional modes at level
+3, and so on.</p>
+<p>For each group, the conditional mode is identified using Newton’s
+method on the likelihood for that unit (<span class="math inline">\(\ell^{(l)}_j\)</span>) at a particular level of
+<span class="math inline">\(u^{(l)}\)</span>, called <span class="math inline">\(\hat{u}\)</span>, and conditional on an existing
+estimate of <span class="math inline">\(\theta\)</span>, <span class="math display">\[\begin{equation}
+\ell^{(l)}_j(\hat{\bm{u}}^{(l)}; \bm{y},\bm{X}, \bm{Z},\bm{W}|
+\bm{\theta}) = \ln \left[ {g^{(l)}(\hat{\bm{u}}^{(l)})\sum_{j'}
+{\bm{w}^{(l-1)}_{j'} \ell^{(l-1)}_{j'} (\bm{\theta} ; \bm{y},
+\bm{X}, \bm{Z},\bm{W}| \hat{\bm{u}}^{(l)}) }} \right] \label{eq:map}
+\end{equation}\]</span> where this formulation implicitly sets all
+values of <span class="math inline">\(\bm{U}^{(l)}\)</span> to zero.
+Note that the values of <span class="math inline">\(\ell^{(l-l)}_{j'}\)</span> still integrate out
+the values of <span class="math inline">\(\bm{u}\)</span> for all levels
+below <span class="math inline">\(l\)</span>.</p>
+<p>Newton’s method requires a first and second derivative, and these are
+calculated with numerical derivatives of the likelihood calculated using
+numerical quadrature.</p>
 </div>
 <div class="section level4">
 <h4 id="estimate-of-the-conditional-means">Estimate of the Conditional Means<a class="anchor" aria-label="anchor" href="#estimate-of-the-conditional-means"></a>
 </h4>
-<p>The conditional mean is estimated by simply taking the expected value of each parameter using the following equation:</p>
+<p>The conditional mean is estimated by simply taking the expected value
+of each parameter using the following equation:</p>
 <p><span class="math display">\[\begin{equation}
-E \left( \hat{\bm{u}}| \bm{y}, \bm{X}, \bm{Z}, \bm{W}, \bm{\theta} \right) = \frac{\int_{-\infty}^{\infty} \tilde{\bm{u}}^{(l-1)} \cdot \ell^{(l)}_j(\hat{\bm{u}}; \bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{\theta}) d\hat{u}}{\int_{-\infty}^{\infty} \ell^{(l)}_j(\tilde{\bm{u}}^{(l-1)}; \bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{\theta}) d\hat{u}}
+E \left( \hat{\bm{u}}| \bm{y}, \bm{X}, \bm{Z}, \bm{W}, \bm{\theta}
+\right) = \frac{\int_{-\infty}^{\infty} \tilde{\bm{u}}^{(l-1)} \cdot
+\ell^{(l)}_j(\hat{\bm{u}}; \bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{\theta})
+d\hat{u}}{\int_{-\infty}^{\infty} \ell^{(l)}_j(\tilde{\bm{u}}^{(l-1)};
+\bm{y},\bm{X}, \bm{Z},\bm{W}| \bm{\theta}) d\hat{u}}
 \end{equation}\]</span></p>
 <div style="page-break-after: always;"></div>
 </div>
@@ -352,137 +683,163 @@ E \left( \hat{\bm{u}}| \bm{y}, \bm{X}, \bm{Z}, \bm{W}, \bm{\theta} \right) = \fr
 <div class="section level2">
 <h2 id="appendix-b--alternative-software-specifications">Appendix B. Alternative Software Specifications<a class="anchor" aria-label="anchor" href="#appendix-b--alternative-software-specifications"></a>
 </h2>
-<p>For reference, these sections s how the specification of the models in Stata GLLAMM, Stata <code>mixed</code>, SAS <code>PROC GLIMMIX</code>, HLM, and M+.</p>
+<p>For reference, these sections s how the specification of the models
+in Stata GLLAMM, Stata <code>mixed</code>, SAS
+<code>PROC GLIMMIX</code>, HLM, and M+.</p>
 <div class="section level3">
 <h3 id="stata-gllamm">Stata: GLLAMM<a class="anchor" aria-label="anchor" href="#stata-gllamm"></a>
 </h3>
-<p>In Stata prior to Version 14, weighted mixed-effects models could be estimated only with GLLAMM (Rabe-Hesketh, Skrondal, &amp; Pickles, 2004). The work of these GLLAMM authors provided the methods that we used in our implementation of nonlinear weighted mixed models in .</p>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1"></a>import delimited <span class="st">"PISA2012_USA.csv"</span></span>
-<span id="cb6-2"><a href="#cb6-2"></a></span>
-<span id="cb6-3"><a href="#cb6-3"></a>generate intercept =<span class="st"> </span><span class="dv">1</span></span>
-<span id="cb6-4"><a href="#cb6-4"></a>eq intercept<span class="op">:</span><span class="st"> </span>intercept</span>
-<span id="cb6-5"><a href="#cb6-5"></a>eq slope<span class="op">:</span><span class="st"> </span>escs</span>
-<span id="cb6-6"><a href="#cb6-6"></a>tabulate st29q03, <span class="kw">generate</span> (st29q03d)</span>
-<span id="cb6-7"><a href="#cb6-7"></a>tabulate sc14q02, <span class="kw">generate</span> (sc14q02d)</span>
-<span id="cb6-8"><a href="#cb6-8"></a>tabulate st04q01, <span class="kw">generate</span> (st04q01d)</span>
-<span id="cb6-9"><a href="#cb6-9"></a></span>
-<span id="cb6-10"><a href="#cb6-10"></a><span class="op">/</span><span class="er">/</span>Random intercept model </span>
-<span id="cb6-11"><a href="#cb6-11"></a>gllamm pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2 </span>
-<span id="cb6-12"><a href="#cb6-12"></a>escs, <span class="kw">i</span>(schoolid) <span class="kw">pweight</span>(pwt) <span class="kw">l</span>(identity) <span class="kw">f</span>(gau) <span class="kw">nip</span>(<span class="dv">27</span>) <span class="kw">nrf</span>(<span class="dv">1</span>) <span class="kw">eqs</span>(intercept) </span>
-<span id="cb6-13"><a href="#cb6-13"></a>adapt nocorrel</span>
-<span id="cb6-14"><a href="#cb6-14"></a></span>
-<span id="cb6-15"><a href="#cb6-15"></a></span>
-<span id="cb6-16"><a href="#cb6-16"></a><span class="op">/</span><span class="er">/</span>Random slope and intercept model </span>
-<span id="cb6-17"><a href="#cb6-17"></a>gllamm pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2</span>
-<span id="cb6-18"><a href="#cb6-18"></a>escs, <span class="kw">i</span>(schoolid) <span class="kw">pweight</span>(pwt) <span class="kw">l</span>(identity) <span class="kw">f</span>(gau) <span class="kw">nip</span>(<span class="dv">13</span>) <span class="kw">nrf</span>(<span class="dv">2</span>) <span class="kw">eqs</span>(intercept slope) </span>
-<span id="cb6-19"><a href="#cb6-19"></a>adapt nocorrel</span></code></pre></div>
+<p>In Stata prior to Version 14, weighted mixed-effects models could be
+estimated only with GLLAMM (Rabe-Hesketh, Skrondal, &amp; Pickles,
+2004). The work of these GLLAMM authors provided the methods that we
+used in our implementation of nonlinear weighted mixed models in .</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>import delimited <span class="st">"PISA2012_USA.csv"</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>generate intercept <span class="ot">=</span> <span class="dv">1</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>eq intercept<span class="sc">:</span> intercept</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>eq slope<span class="sc">:</span> escs</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>tabulate st29q03, <span class="fu">generate</span> (st29q03d)</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>tabulate sc14q02, <span class="fu">generate</span> (sc14q02d)</span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>tabulate st04q01, <span class="fu">generate</span> (st04q01d)</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="sc">/</span><span class="er">/</span>Random intercept model </span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a>gllamm pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2 </span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a>escs, <span class="fu">i</span>(schoolid) <span class="fu">pweight</span>(pwt) <span class="fu">l</span>(identity) <span class="fu">f</span>(gau) <span class="fu">nip</span>(<span class="dv">27</span>) <span class="fu">nrf</span>(<span class="dv">1</span>) <span class="fu">eqs</span>(intercept) </span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a>adapt nocorrel</span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="sc">/</span><span class="er">/</span>Random slope and intercept model </span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a>gllamm pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2</span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>escs, <span class="fu">i</span>(schoolid) <span class="fu">pweight</span>(pwt) <span class="fu">l</span>(identity) <span class="fu">f</span>(gau) <span class="fu">nip</span>(<span class="dv">13</span>) <span class="fu">nrf</span>(<span class="dv">2</span>) <span class="fu">eqs</span>(intercept slope) </span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>adapt nocorrel</span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="stata-mixed">Stata: mixed<a class="anchor" aria-label="anchor" href="#stata-mixed"></a>
 </h3>
-<p>In Stata Version 14, the <code>mixed</code> command includes the ability to fit models with survey weights (StataCorp, 2015).</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1"></a>import delimited <span class="st">"PISA2012_USA.csv"</span></span>
-<span id="cb7-2"><a href="#cb7-2"></a>tabulate st29q03, <span class="kw">generate</span> (st29q03d)</span>
-<span id="cb7-3"><a href="#cb7-3"></a>tabulate sc14q02, <span class="kw">generate</span> (sc14q02d)</span>
-<span id="cb7-4"><a href="#cb7-4"></a>tabulate st04q01, <span class="kw">generate</span> (st04q01d)</span>
-<span id="cb7-5"><a href="#cb7-5"></a></span>
-<span id="cb7-6"><a href="#cb7-6"></a><span class="op">/</span><span class="er">/</span>Random intercept model </span>
-<span id="cb7-7"><a href="#cb7-7"></a>mixed pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2 </span>
-<span id="cb7-8"><a href="#cb7-8"></a>escs [pw =<span class="st"> </span>pwt1] <span class="op">||</span><span class="st"> </span>schoolid<span class="op">:</span><span class="st"> </span>, <span class="kw">pweight</span> (pwt2)</span>
-<span id="cb7-9"><a href="#cb7-9"></a></span>
-<span id="cb7-10"><a href="#cb7-10"></a><span class="op">/</span><span class="er">/</span>Random slope and intercept model </span>
-<span id="cb7-11"><a href="#cb7-11"></a>mixed pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04</span>
-<span id="cb7-12"><a href="#cb7-12"></a>q01d2 escs [pw =<span class="st"> </span>pwt1] <span class="op">||</span><span class="st"> </span>schoolid<span class="op">:</span><span class="st"> </span>escs, <span class="kw">pweight</span> (pwt2)</span></code></pre></div>
+<p>In Stata Version 14, the <code>mixed</code> command includes the
+ability to fit models with survey weights (StataCorp, 2015).</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>import delimited <span class="st">"PISA2012_USA.csv"</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>tabulate st29q03, <span class="fu">generate</span> (st29q03d)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>tabulate sc14q02, <span class="fu">generate</span> (sc14q02d)</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>tabulate st04q01, <span class="fu">generate</span> (st04q01d)</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a><span class="sc">/</span><span class="er">/</span>Random intercept model </span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>mixed pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04q01d2 </span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>escs [pw <span class="ot">=</span> pwt1] <span class="sc">||</span> schoolid<span class="sc">:</span> , <span class="fu">pweight</span> (pwt2)</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="sc">/</span><span class="er">/</span>Random slope and intercept model </span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a>mixed pv1math st29q03d1 st29q03d2 st29q03d4 sc14q02d1 sc14q02d3 sc14q02d4 st04</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a>q01d2 escs [pw <span class="ot">=</span> pwt1] <span class="sc">||</span> schoolid<span class="sc">:</span> escs, <span class="fu">pweight</span> (pwt2)</span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="sas-proc-glimmix">SAS <code>PROC GLIMMIX</code><a class="anchor" aria-label="anchor" href="#sas-proc-glimmix"></a>
 </h3>
-<p>Model specification in SAS uses the <code>PROC GLIMMIX</code> procedure (SAS Institute Inc., 2013). It is notable here that when fit with the default optimization parameters, the model converged to a likelihood lower than the maximum likelihood estimate found by other software. Decreasing the convergence parameter GCONV to E-10 was necessary to find the same maximum likelihood as other software.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1"></a>PROC IMIPORT DATAFILE=<span class="st">"PISA2012_USA.csv"</span></span>
-<span id="cb8-2"><a href="#cb8-2"></a>     OUT=pisa_data DBMS=csv REPLACE;</span>
-<span id="cb8-3"><a href="#cb8-3"></a>RUN;</span>
-<span id="cb8-4"><a href="#cb8-4"></a></span>
-<span id="cb8-5"><a href="#cb8-5"></a>PROC GLIMMIX DATA=pisa_data METHOD=<span class="kw">quadrature</span>(<span class="dt">qpoints=</span><span class="dv">27</span>) EMPIRICAL=classical NOREML; </span>
-<span id="cb8-6"><a href="#cb8-6"></a>  NLOPTIONS GCONV=<span class="fl">1E-10</span> TECHNIQUE=TRUREG;</span>
-<span id="cb8-7"><a href="#cb8-7"></a>  CLASS  <span class="kw">sc14q02</span>(<span class="dt">REF=</span><span class="st">'Not at all'</span>) <span class="kw">st04q01</span>(<span class="dt">REF=</span><span class="st">'Female'</span>) <span class="kw">st29q03</span>(<span class="dt">REF=</span><span class="st">'Strongly agree'</span>);</span>
-<span id="cb8-8"><a href="#cb8-8"></a>  MODEL pv1math =<span class="st"> </span>escs sc14q02 st04q01 st29q03<span class="op">/</span><span class="st"> </span>OBSWEIGHT=pwt1 SOLUTION;</span>
-<span id="cb8-9"><a href="#cb8-9"></a>  RANDOM INT<span class="op">/</span>subject=schoolid WEIGHT=pwt2;</span>
-<span id="cb8-10"><a href="#cb8-10"></a>RUN;</span>
-<span id="cb8-11"><a href="#cb8-11"></a></span>
-<span id="cb8-12"><a href="#cb8-12"></a>     </span>
-<span id="cb8-13"><a href="#cb8-13"></a>PROC GLIMMIX DATA=pisa_data METHOD=<span class="kw">quadrature</span>(<span class="dt">qpoints=</span><span class="dv">13</span>) EMPIRICAL=classical NOREML;</span>
-<span id="cb8-14"><a href="#cb8-14"></a>  NLOPTIONS GCONV=<span class="fl">1E-10</span> TECHNIQUE=TRUREG;</span>
-<span id="cb8-15"><a href="#cb8-15"></a>  CLASS  <span class="kw">sc14q02</span>(<span class="dt">REF=</span><span class="st">'Not at all'</span>) <span class="kw">st04q01</span>(<span class="dt">REF=</span><span class="st">'Female'</span>) <span class="kw">st29q03</span>(<span class="dt">REF=</span><span class="st">'Strongly agree'</span>);</span>
-<span id="cb8-16"><a href="#cb8-16"></a>  MODEL pv1math =<span class="st"> </span>escs sc14q02 st04q01 st29q03<span class="op">/</span><span class="st"> </span>OBSWEIGHT=pwt1 SOLUTION;</span>
-<span id="cb8-17"><a href="#cb8-17"></a>  RANDOM intercept escs<span class="op">/</span>subject=schoolid WEIGHT=pwt2;</span>
-<span id="cb8-18"><a href="#cb8-18"></a>RUN;</span></code></pre></div>
+<p>Model specification in SAS uses the <code>PROC GLIMMIX</code>
+procedure (SAS Institute Inc., 2013). It is notable here that when fit
+with the default optimization parameters, the model converged to a
+likelihood lower than the maximum likelihood estimate found by other
+software. Decreasing the convergence parameter GCONV to E-10 was
+necessary to find the same maximum likelihood as other software.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>PROC IMIPORT DATAFILE<span class="ot">=</span><span class="st">"PISA2012_USA.csv"</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>     OUT<span class="ot">=</span>pisa_data DBMS<span class="ot">=</span>csv REPLACE;</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>RUN;</span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>PROC GLIMMIX DATA<span class="ot">=</span>pisa_data METHOD<span class="ot">=</span><span class="fu">quadrature</span>(<span class="at">qpoints=</span><span class="dv">27</span>) EMPIRICAL<span class="ot">=</span>classical NOREML; </span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a>  NLOPTIONS GCONV<span class="ot">=</span><span class="fl">1E-10</span> TECHNIQUE<span class="ot">=</span>TRUREG;</span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a>  CLASS  <span class="fu">sc14q02</span>(<span class="at">REF=</span><span class="st">'Not at all'</span>) <span class="fu">st04q01</span>(<span class="at">REF=</span><span class="st">'Female'</span>) <span class="fu">st29q03</span>(<span class="at">REF=</span><span class="st">'Strongly agree'</span>);</span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a>  MODEL pv1math <span class="ot">=</span> escs sc14q02 st04q01 st29q03<span class="sc">/</span> OBSWEIGHT<span class="ot">=</span>pwt1 SOLUTION;</span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a>  RANDOM INT<span class="sc">/</span>subject<span class="ot">=</span>schoolid WEIGHT<span class="ot">=</span>pwt2;</span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a>RUN;</span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a>     </span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a>PROC GLIMMIX DATA<span class="ot">=</span>pisa_data METHOD<span class="ot">=</span><span class="fu">quadrature</span>(<span class="at">qpoints=</span><span class="dv">13</span>) EMPIRICAL<span class="ot">=</span>classical NOREML;</span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a>  NLOPTIONS GCONV<span class="ot">=</span><span class="fl">1E-10</span> TECHNIQUE<span class="ot">=</span>TRUREG;</span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a>  CLASS  <span class="fu">sc14q02</span>(<span class="at">REF=</span><span class="st">'Not at all'</span>) <span class="fu">st04q01</span>(<span class="at">REF=</span><span class="st">'Female'</span>) <span class="fu">st29q03</span>(<span class="at">REF=</span><span class="st">'Strongly agree'</span>);</span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a>  MODEL pv1math <span class="ot">=</span> escs sc14q02 st04q01 st29q03<span class="sc">/</span> OBSWEIGHT<span class="ot">=</span>pwt1 SOLUTION;</span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a>  RANDOM intercept escs<span class="sc">/</span>subject<span class="ot">=</span>schoolid WEIGHT<span class="ot">=</span>pwt2;</span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>RUN;</span></code></pre></div>
 </div>
 <div class="section level3">
 <h3 id="hlm">HLM<a class="anchor" aria-label="anchor" href="#hlm"></a>
 </h3>
-<p>HLM is another software package for estimated mixed-effects models (Raudenbush et al., 2016). It is important to note that HLM has two differences from the methods specified in other software. HLM normalizes all weights (which other programs do not) and also does not allow the correlation between slope and random effect to be fixed at 0. Using the “Diagonalize Tau” option reduces covariance but does not fix it at 0 (Raudenbush et al., 2016). In addition, HLM is entirely based on a graphical user interface. Specification of the HLM model for comparison here was done through the interface. The random intercept model was specified as follows:</p>
+<p>HLM is another software package for estimated mixed-effects models
+(Raudenbush et al., 2016). It is important to note that HLM has two
+differences from the methods specified in other software. HLM normalizes
+all weights (which other programs do not) and also does not allow the
+correlation between slope and random effect to be fixed at 0. Using the
+“Diagonalize Tau” option reduces covariance but does not fix it at 0
+(Raudenbush et al., 2016). In addition, HLM is entirely based on a
+graphical user interface. Specification of the HLM model for comparison
+here was done through the interface. The random intercept model was
+specified as follows:</p>
 <p></p>
 <p>The random slope and intercept model was specified as follows:</p>
 <p></p>
-<p>Note: The specifications for the random intercept model and the random slope model are extremely similar; in the second image for <span class="math inline">\(\beta_1\)</span>, the <span class="math inline">\(u_1\)</span> is highlighted. This is how users in HLM add random effects.</p>
+<p>Note: The specifications for the random intercept model and the
+random slope model are extremely similar; in the second image for <span class="math inline">\(\beta_1\)</span>, the <span class="math inline">\(u_1\)</span> is highlighted. This is how users in
+HLM add random effects.</p>
 </div>
 <div class="section level3">
 <h3 id="m">M+<a class="anchor" aria-label="anchor" href="#m"></a>
 </h3>
-<p>M+ is another common software used to fix mixed effects models. You should plan to make all categorical variables into dummy variables prior to fitting the model. To fit the random intercept model, use the following:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1"></a>DATA<span class="op">:</span><span class="st"> </span>FILE=<span class="st"> </span>pisa_<span class="dv">2012</span>_with_dummies.csv;</span>
-<span id="cb9-2"><a href="#cb9-2"></a></span>
-<span id="cb9-3"><a href="#cb9-3"></a>VARIABLE<span class="op">:</span><span class="st"> </span>NAMES=<span class="st"> </span>id schoolid pv1math escs pwt1 pwt2 s29q03d1 s29q03d2</span>
-<span id="cb9-4"><a href="#cb9-4"></a>s29q03d4 int c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb9-5"><a href="#cb9-5"></a>CLUSTER =<span class="st"> </span>schoolid;</span>
-<span id="cb9-6"><a href="#cb9-6"></a>WITHIN =<span class="st"> </span>escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb9-7"><a href="#cb9-7"></a></span>
-<span id="cb9-8"><a href="#cb9-8"></a>USEVARIABLES=<span class="st"> </span>schoolid pv1math escs  s29q03d1 s29q03d2</span>
-<span id="cb9-9"><a href="#cb9-9"></a>s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2 pwt1 pwt2;</span>
-<span id="cb9-10"><a href="#cb9-10"></a></span>
-<span id="cb9-11"><a href="#cb9-11"></a>WEIGHT IS pwt1;</span>
-<span id="cb9-12"><a href="#cb9-12"></a>BWEIGHT =<span class="st"> </span>pwt2;</span>
-<span id="cb9-13"><a href="#cb9-13"></a>wtscale=unscaled;</span>
-<span id="cb9-14"><a href="#cb9-14"></a>bwtscale=unscaled;</span>
-<span id="cb9-15"><a href="#cb9-15"></a></span>
-<span id="cb9-16"><a href="#cb9-16"></a>ANALYSIS<span class="op">:</span><span class="st"> </span>TYPE =<span class="st"> </span>TWOLEVEL;</span>
-<span id="cb9-17"><a href="#cb9-17"></a></span>
-<span id="cb9-18"><a href="#cb9-18"></a>MODEL<span class="op">:</span></span>
-<span id="cb9-19"><a href="#cb9-19"></a><span class="op">%WITHIN%</span></span>
-<span id="cb9-20"><a href="#cb9-20"></a>pv1math ON escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb9-21"><a href="#cb9-21"></a><span class="op">%BETWEEN%</span></span>
-<span id="cb9-22"><a href="#cb9-22"></a>pv1math;</span></code></pre></div>
+<p>M+ is another common software used to fix mixed effects models. You
+should plan to make all categorical variables into dummy variables prior
+to fitting the model. To fit the random intercept model, use the
+following:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>DATA<span class="sc">:</span> FILE<span class="ot">=</span> pisa_2012_with_dummies.csv;</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>VARIABLE<span class="sc">:</span> NAMES<span class="ot">=</span> id schoolid pv1math escs pwt1 pwt2 s29q03d1 s29q03d2</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>s29q03d4 int c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>CLUSTER <span class="ot">=</span> schoolid;</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>WITHIN <span class="ot">=</span> escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>USEVARIABLES<span class="ot">=</span> schoolid pv1math escs  s29q03d1 s29q03d2</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2 pwt1 pwt2;</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>WEIGHT IS pwt1;</span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>BWEIGHT <span class="ot">=</span> pwt2;</span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a>wtscale<span class="ot">=</span>unscaled;</span>
+<span id="cb9-14"><a href="#cb9-14" tabindex="-1"></a>bwtscale<span class="ot">=</span>unscaled;</span>
+<span id="cb9-15"><a href="#cb9-15" tabindex="-1"></a></span>
+<span id="cb9-16"><a href="#cb9-16" tabindex="-1"></a>ANALYSIS<span class="sc">:</span> TYPE <span class="ot">=</span> TWOLEVEL;</span>
+<span id="cb9-17"><a href="#cb9-17" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" tabindex="-1"></a>MODEL<span class="sc">:</span></span>
+<span id="cb9-19"><a href="#cb9-19" tabindex="-1"></a><span class="sc">%WITHIN%</span></span>
+<span id="cb9-20"><a href="#cb9-20" tabindex="-1"></a>pv1math ON escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb9-21"><a href="#cb9-21" tabindex="-1"></a><span class="sc">%BETWEEN%</span></span>
+<span id="cb9-22"><a href="#cb9-22" tabindex="-1"></a>pv1math;</span></code></pre></div>
 <p>To fit the random slope model, use the following:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1"></a>DATA<span class="op">:</span><span class="st"> </span>FILE=pisa_<span class="dv">2012</span>_with_dummies.csv;</span>
-<span id="cb10-2"><a href="#cb10-2"></a></span>
-<span id="cb10-3"><a href="#cb10-3"></a>VARIABLE<span class="op">:</span><span class="st"> </span>NAMES=<span class="st"> </span>id schoolid pv1math escs pwt1 pwt2 s29q03d1 s29q03d2</span>
-<span id="cb10-4"><a href="#cb10-4"></a>s29q03d4 int c14q02d1 c14q02d2 c14q02d4 s04q01d2 escs2;</span>
-<span id="cb10-5"><a href="#cb10-5"></a>CLUSTER =<span class="st"> </span>schoolid;</span>
-<span id="cb10-6"><a href="#cb10-6"></a>WITHIN =<span class="st"> </span>escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb10-7"><a href="#cb10-7"></a></span>
-<span id="cb10-8"><a href="#cb10-8"></a>USEVARIABLES=<span class="st"> </span>schoolid pv1math escs  s29q03d1 s29q03d2</span>
-<span id="cb10-9"><a href="#cb10-9"></a>s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2 pwt1 pwt2;</span>
-<span id="cb10-10"><a href="#cb10-10"></a></span>
-<span id="cb10-11"><a href="#cb10-11"></a>WEIGHT IS pwt1;</span>
-<span id="cb10-12"><a href="#cb10-12"></a>BWEIGHT =<span class="st"> </span>pwt2;</span>
-<span id="cb10-13"><a href="#cb10-13"></a>wtscale=unscaled;</span>
-<span id="cb10-14"><a href="#cb10-14"></a>bwtscale=unscaled;</span>
-<span id="cb10-15"><a href="#cb10-15"></a></span>
-<span id="cb10-16"><a href="#cb10-16"></a>ANALYSIS<span class="op">:</span><span class="st"> </span>TYPE =<span class="st"> </span>TWOLEVEL RANDOM;</span>
-<span id="cb10-17"><a href="#cb10-17"></a></span>
-<span id="cb10-18"><a href="#cb10-18"></a>MODEL<span class="op">:</span></span>
-<span id="cb10-19"><a href="#cb10-19"></a><span class="op">%WITHIN%</span></span>
-<span id="cb10-20"><a href="#cb10-20"></a>pv1math on s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
-<span id="cb10-21"><a href="#cb10-21"></a>slope <span class="op">|</span><span class="st"> </span>pv1math ON escs ;</span>
-<span id="cb10-22"><a href="#cb10-22"></a><span class="op">%BETWEEN%</span></span>
-<span id="cb10-23"><a href="#cb10-23"></a>pv1math with slope <span class="op">@</span><span class="dv">0</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>DATA<span class="sc">:</span> FILE<span class="ot">=</span>pisa_2012_with_dummies.csv;</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>VARIABLE<span class="sc">:</span> NAMES<span class="ot">=</span> id schoolid pv1math escs pwt1 pwt2 s29q03d1 s29q03d2</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>s29q03d4 int c14q02d1 c14q02d2 c14q02d4 s04q01d2 escs2;</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>CLUSTER <span class="ot">=</span> schoolid;</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>WITHIN <span class="ot">=</span> escs s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>USEVARIABLES<span class="ot">=</span> schoolid pv1math escs  s29q03d1 s29q03d2</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2 pwt1 pwt2;</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a></span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>WEIGHT IS pwt1;</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>BWEIGHT <span class="ot">=</span> pwt2;</span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>wtscale<span class="ot">=</span>unscaled;</span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>bwtscale<span class="ot">=</span>unscaled;</span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>ANALYSIS<span class="sc">:</span> TYPE <span class="ot">=</span> TWOLEVEL RANDOM;</span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a></span>
+<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>MODEL<span class="sc">:</span></span>
+<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a><span class="sc">%WITHIN%</span></span>
+<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a>pv1math on s29q03d1 s29q03d2 s29q03d4 c14q02d1 c14q02d2 c14q02d4 s04q01d2;</span>
+<span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a>slope <span class="sc">|</span> pv1math ON escs ;</span>
+<span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a><span class="sc">%BETWEEN%</span></span>
+<span id="cb10-23"><a href="#cb10-23" tabindex="-1"></a>pv1math with slope <span class="sc">@</span><span class="dv">0</span></span></code></pre></div>
 <div style="page-break-after: always;"></div>
 </div>
 </div>
 <div class="section level2">
 <h2 id="appendix-c--example-data-preparation">Appendix C. Example Data Preparation<a class="anchor" aria-label="anchor" href="#appendix-c--example-data-preparation"></a>
 </h2>
-<p>Data are read using the  package to access the PISA data efficiently.</p>
+<p>Data are read using the package to access the PISA data
+efficiently.</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://www.air.org/project/nces-data-r-project-edsurvey" class="external-link">EdSurvey</a></span><span class="op">)</span></span>
 <span></span>

@@ -355,6 +355,19 @@ test_that("Unweighted three level model", {
   sleepstudy2$w3 <- 1
   wm0 <- mix(Reaction ~ Days + (1|Subject) + (0+Days|Subject) + (1 | Group), data=sleepstudy2, weights=c("w1", "w2","w3"), verbose=FALSE, run=TRUE)
   lm0 <- lmer(Reaction ~ Days + (1|Subject) + (0+Days|Subject) + (1 | Group), data=sleepstudy2,REML=FALSE)
+  wm0RE <- wm0$ranefMat
+  lm0RE <- ranef(lm0)
+  expect_equal(names(wm0RE), names(lm0RE))
+  attr(lm0RE$Subject, "postVar") <- NULL
+  expect_equal(wm0RE$Subject, lm0RE$Subject, tol=.Machine$double.eps^0.25)
+  attr(lm0RE$Group, "postVar") <- NULL
+  expect_equal(wm0RE$Group, lm0RE$Group, tol=.Machine$double.eps^0.25)
+
+  wm0RE <- wm0$ranefMat
+  lm0RE <- ranef(lm0)
+  attr(lm0RE$Subject, "postVar") <- NULL
+  expect_equal(wm0RE$Subject, lm0RE$Subject, tol=.Machine$double.eps^0.25)
+  
   # check vars
   lmevars1 <- data.frame(summary(lm0)$varcor)$sdcor
   expect_equal(unname(wm0$vars),

@@ -286,6 +286,7 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
     # used to find columns with no-non-zero elements
     # grab and the random effect vector
     u <- ub[1:ncol(Z)]
+    names(u) <- colnames(Z)
     IMatCols <- ncol(ZiAl[[1]])
     groupsTop <- unique(groupID[ , ncol(groupID)])
     if(lndetLz0u) {
@@ -405,10 +406,10 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
       lli <- lambda_by_level[[li]]
       ni <- nrow(lli)
       bb[[li]] <- lli %*% u[u0 + 1:ni]
+      rownames(bb[[li]]) <- names(u[u0 + 1:ni])
       u0 <- u0 + ni
       vc[li,li] <- 1/(ni) * sum((bb[[li]])^2) # mean already 0
     }
-    
     # the discrepancy ||W12(y-Xb-Zu)||^2 + ||Psi(u)||^2
     discrep <- discf(y, Zt, X, lambda, u, Psi12, W12, b)
     # the R22 matrix, bottom right of the big R, conforms with b
@@ -626,9 +627,11 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
       # just beta part of J
       varBetaRobust <- as(cov_mat %*% J[1:length(b), 1:length(b)] %*% cov_mat , "matrix")
       colnames(J) <- rownames(J) <- c(names(b), names(v), "sigma")
+      resid <- y - Matrix::t(Zt) %*% lambda %*% u - X %*% b
       res <- c(res, list(varBetaRobust=varBetaRobust,
                          seBetaRobust=sqrt(diag(varBetaRobust)), iDelta=iDelta,
-                         Jacobian=J))
+                         Jacobian=J,
+                         resid=resid))
     }
     return(res)
   }

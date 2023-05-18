@@ -61,7 +61,7 @@
 #' \item{lnl}{numeric, the log-likelihood of the model. }
 #' \item{coef}{numeric vector, the estimated coefficients of the model. }
 #' \item{ranefs}{the group-level random effects.}
-#' \item{SE}{the standard errors of the fixed effects, robust if robustSE was set to true.}
+#' \item{SE}{the cluste robust (CR-0) standard errors of the fixed effects.}
 #' \item{vars}{numeric vector, the random effect variances.}
 #' \item{theta}{the theta vector.}
 #' \item{call}{the original call used.}
@@ -394,12 +394,15 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     temp_Z <- getME(lme, "Ztlist")
     #find out which level each applies to 
     z_levels <- unique(lmeVarDF[lmeVarDF$fullGroup%in%names(temp_Z),c("fullGroup","level")])
+    z_level_names <- lmeVarDF[lmeVarDF$fullGroup%in%names(temp_Z),c("grp","level")]
+    z_level_names <- z_level_names[order(z_level_names$level),]
+    z_level_names <- z_level_names[!duplicated(z_level_names$level),"grp"]
     Zlist <- list()
     for (i in 2:levels){
       z_names <- z_levels[z_levels$level==i,"fullGroup"]
       Zlist[[i-1]] <- Matrix::t(do.call(rbind, temp_Z[z_names]))
-      #Zlist[[i-1]] <- t(as.matrix((Reduce(rbind, temp_Z[z_names]))))
     }
+    names(Zlist) <- z_level_names
     #seperating into single random effects using the pointers
     pointers <- getME(lme, "Gp")
 
@@ -626,6 +629,9 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
                is_adaptive=FALSE, sigma=bhatq$sigma, cov_mat=bhatq$varBetaRobust,
                ngroups=ngroups, varDF=varDF, varVC=varVC,var_theta=var_of_var,
                wgtStats=ngrpW, ranefMat = uMatList)
+    if("resid" %in% names(bhatq)) {
+      res <- c(res, list(resid=bhatq$resid))
+    }
     class(res) <- "WeMixResults"
     return(res)
   }
@@ -797,7 +803,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   
   #set up the variance covariance matrix 
   varDF <- lmeVarDF[,c("grp", "var1", "var2", "vcov", "ngrp", "level")]
-  
+
   varDF$vcov <- 0
   varDF$fullGroup <- paste0(varDF$grp,ifelse(!is.na(varDF$var1),paste0(".",varDF$var1),""))
   

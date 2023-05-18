@@ -70,7 +70,7 @@ This is a list with elements:
 \item{lnl}{numeric, the log-likelihood of the model. }
 \item{coef}{numeric vector, the estimated coefficients of the model. }
 \item{ranefs}{the group-level random effects.}
-\item{SE}{the standard errors of the fixed effects, robust if robustSE was set to true.}
+\item{SE}{the cluste robust (CR-0) standard errors of the fixed effects.}
 \item{vars}{numeric vector, the random effect variances.}
 \item{theta}{the theta vector.}
 \item{call}{the original call used.}
