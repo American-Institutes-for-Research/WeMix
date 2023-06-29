@@ -468,6 +468,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     if(verbose) {
       message("Fitting weighted model.")
     }
+    # fix theta because bobyqa throws an error when the incoming value is zero
+    theta[abs(theta) < 1e-2] <- 1e-2
     opt <- bobyqa(fn=bsqG, par=theta)
     names(opt$par) <- names(theta)
     

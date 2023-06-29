@@ -812,6 +812,7 @@ test_that("Weighted v unweighted replicated two level model, poisson", {
 context("Quadrature works, 3 RE at level 2")
 test_that("Quadrature works, 3 RE at level 2", {
   skip_on_cran()
+  skip_if_not_installed("glmmTMB")
   require(glmmTMB)
   owls2 <- Owls
   owls2$w1 <- 1 
