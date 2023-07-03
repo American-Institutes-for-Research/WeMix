@@ -18,7 +18,7 @@ test_that("Model with top level groups that have entirely 0 columns in Z", {
   require(EdSurvey)
   downloadECLS_K(root=edsurveyHome, years=2011, verbose=FALSE)
   ee <- readECLS_K2011(paste0(edsurveyHome, "ECLS_K/2011/"), verbose=FALSE)
-  gg <- EdSurvey::getData(c("x2rscalk5", "childid", "s2_id", "w1_2p0", "x3sumsh", "p1chldbk","p2freerd"), data=ee, omittedLevels=FALSE, returnJKreplicates=FALSE)
+  gg <- EdSurvey::getData(c("x2rscalk5", "childid", "s2_id", "w1_2p0", "x3sumsh", "p1chldbk","p2freerd"), data=ee, dropOmittedLevels=FALSE, returnJKreplicates=FALSE)
   gg$frpl <- ifelse(gg$p2freerd %in% c("1: FREE LUNCH", "2: REDUCED PRICE LUNCH"), 1, 0)
   gg$w1 <- gg$w1_2p0
   gg$w2 <- 1

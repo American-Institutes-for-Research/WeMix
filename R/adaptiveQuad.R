@@ -1439,13 +1439,13 @@ fit_unweighted_model <- function(formula, data, family, verbose) {
     if(verbose) {
       cat("Using lmer to get an approximate (unweighted) estimate and model structure.\n")
     }
-    # warnings happen on e.g. near-singular solve and are not a concern
-    suppressWarnings(lme <- lmer(formula, data, REML=FALSE))
+    # warnings, messages happen on e.g. near-singular solve and are not a concern
+    suppressMessages(suppressWarnings(lme <- lmer(formula, data, REML=FALSE)))
   } else {
     if(verbose) {
       cat("Using glmer to get an approximate (unweighted) estimate and model structure.\n")
     }
-    lme <- glmer(formula, data, family=family)
+    suppressMessages(suppressWarnings(lme <- glmer(formula, data, family=family)))
   }
   return(lme)
 }

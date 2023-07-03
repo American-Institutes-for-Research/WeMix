@@ -1,15 +1,7 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
-\section{Changes in version 4.0.0}{
-  \subsection{BIG FIXES}{
-    \itemize{
-      \item the \code{mix} function documentation now notes that the coefficient standard errors are always cluster robust (CR-0) estimates. Thanks to Francis Huang for pointing out that it previously mentioned a non-existent argument.
-    }
-  }
-}
-
-\section{Changes in version 4.0.9000}{
+\section{Changes in version 4.0.900x}{
   \subsection{BUG FIXES}{
     \itemize{
       \item the \code{mix} function documentation now notes that the coefficient standard errors are always cluster robust (CR-0) estimates. Thanks to Francis Huang for pointing out that it previously mentioned a non-existent argument.
