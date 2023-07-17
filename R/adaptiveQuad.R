@@ -455,6 +455,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
         weights_list_cond[[level]] <- cWeights[!duplicated(cWeights[,all_groups[level-1]]), weights0[level]]
       }
     }
+    weights_list <- lapply(weights_list, as.numeric)
+    weights_list_cond <- lapply(weights_list_cond, as.numeric)
     theta <- getME(lme, "theta")
     theta1 <- theta
     for(i in 1:length(theta1)) {
@@ -823,8 +825,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
 # modified by Blue Webb
 pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
                     l2_group_sizes,group_sizes,n_l2,n_top,levels,q2,q3,by_group=FALSE){
-  
-  useCholUpdate <- FALSE
   pirls <- TRUE
   iter <- 0
   Xb <- as.vector(X%*%beta)
@@ -850,13 +850,8 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
     LtZtMWhalf <- as(LtZt%*%(mu_eta*diag(Whalf)),"sparseMatrix")
     
     # update Cholesky decomposition - if fitting unweighted model,
-    # we can use the more efficient update function
-
-    if(useCholUpdate){
-      L <- update(L, LtZtMWhalf, 1) 
-    }else{
-      L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
-    }
+    # we could use the more efficient update function if Psi is I
+    L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
     # update weighted residuals
     wtres <- diag(Whalf)*(y - mu)
     
@@ -893,11 +888,7 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
   mu_eta@x <- family$mu.eta(eta)
   LtZtMWhalf <- as(LtZt%*%(mu_eta*diag(Whalf)),"sparseMatrix")
   # update Cholesky decomposition
-  if(useCholUpdate){
-    L <- update(L,LtZtMWhalf,1)
-  }else{
-    L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
-  }
+  L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
   L <- as(L,"sparseMatrix")
   
   llh <- -0.5*family$aic(y,rep.int(1,length(y)),mu,wt=w1,dev=NULL) - 0.5*sum(PsiVec*u^2) - 
@@ -1286,56 +1277,41 @@ dropNonPositiveWeights <- function(data, weights) {
 
 # return unconditional weights
 getWgts0 <- function(data, weights, cWeights) {
-  wgts0 <- data[ , weights]
+  wgts0 <- as.numeric(data[ , weights[1]])
+  if(length(weights)>1) {
+    for(w in 2:length(weights)) {
+      wgts0 <- cbind(wgts0, as.numeric(data[ , weights[w]]))
+    }
+  }
   if(cWeights) {
     for(i in (ncol(wgts0)-1):1) {
       wgts0[ , i] <- wgts0[ , i] * wgts0[ , i+1]
     }
   }
+  colnames(wgts0) <- weights
   return(wgts0)
 }
 
 # get conditional weights
 getWgtsC <- function(data, weights, cWeights) {
-  wgtsC <- data[ , weights]
+  wgtsC <- as.numeric(data[ , weights[1]])
+  if(length(weights)>1) {
+    for(w in 2:length(weights)) {
+      wgtsC <- cbind(wgtsC, as.numeric(data[ , weights[w]]))
+    }
+  }
   if(!cWeights) {
     for(i in (ncol(wgtsC)-1):1) {
       wgtsC[ , i] <- wgtsC[ , i]/wgtsC[ , i+1]
     }
   }
+  colnames(wgtsC) <- weights
   return(wgtsC)
 }
 
 
 sumsq <- function(x) {
   sum(x^2)
-}
-
-reweight <- function(data, level, method, data_m1=NULL) {
-  if(length(method) > 1) {
-    message("Length of method larger than one, using first method: ", dQuote(method), ".")
-    method <- method[1]
-  }
-  if(!method %in% c("sample size", "effective sample size")) {
-    stop("Unknown re-weighting method: ", dQuote(method), ".")
-  }
-  data$w0 <- data$w
-  if("indexp1" %in% colnames(data)) {
-    data$sumn <- ave(data$w, data$indexp1, FUN=length)
-    data$sumw <- ave(data$w, data$indexp1, FUN=sum)
-    data$sumw2 <- ave(data$w, data$indexp1, FUN=sumsq)
-  } else {
-    data$sumn <- ave(data$w, data$index, FUN=length)
-    data$sumw <- ave(data$w, data$index, FUN=sum)
-    data$sumw2 <- ave(data$w, data$index, FUN=sumsq)
-  }
-  if(method %in% "sample size") {
-    data$w <- data$w0 * data$sumn / data$sumw
-  }
-  if(method %in% "effective sample size") {
-    data$w <- data$w0 * data$sumw / data$sumw2
-  }
-  return(data)
 }
 
 do_center_group <- function(center_group, data, groupNames, weights0) {

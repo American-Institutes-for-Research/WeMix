@@ -699,15 +699,6 @@ qr_qrr <- function(X) {
   return(Matrix::qrR(qr1, backPermute=FALSE))
 }
 
-# return R from a QR
-qrr_ <- function(QR) {
-  if(inherits(QR, "qr")) {
-    return(base::qr.R(QR))
-  } else {
-    return(Matrix::qrR(QR, backPermute=FALSE))
-  }
-}
-
 # run a chol of AtA and return R
 getchr <- function(A) {
   #sometimes we pass an illconditioned matrix and don't care, so eat the warnings

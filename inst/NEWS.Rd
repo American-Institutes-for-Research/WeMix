@@ -4,8 +4,14 @@
 \section{Changes in version 4.0.900x}{
   \subsection{BUG FIXES}{
     \itemize{
+      \item the \code{haven} package doesn't always import data in formats the \code{Matrix} package recognizes. Columns that should be numeric are now cast as numeric before they are used, which may prevent this issue. Thanks to Emilie Franck for pointing this out.
       \item the \code{mix} function documentation now notes that the coefficient standard errors are always cluster robust (CR-0) estimates. Thanks to Francis Huang for pointing out that it previously mentioned a non-existent argument.
       \item the \code{mix} function nolonger fails if the \code{lme4::lmer} fit had a variable of exactly zero because \code{bobyqa} threw an error. Thanks fo Charles Blankenship for identifying this bug.
+    }
+  }
+  \subsection{FUNCTION RETIREMENT}{
+    \itemize{
+      \item the functions \code{getHessian2} and \code{getJacobian} are removed from the package because they are not used.
     }
   }
 }
