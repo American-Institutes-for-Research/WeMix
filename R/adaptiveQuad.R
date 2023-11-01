@@ -50,7 +50,7 @@
 #' traditionally used. We recommend starting at 13 and increasing or decreasing as needed. 
 #' }
 #' @importFrom lme4 getME lmer glmer lFormula GHrule
-#' @importFrom stats dnorm aggregate terms dpois dgamma dbinom ave model.matrix terms.formula as.formula sigma complete.cases update
+#' @importFrom stats dnorm aggregate terms dpois dgamma dbinom ave model.matrix terms.formula as.formula sigma complete.cases update formula gaussian getCall residuals
 #' @importFrom numDeriv genD hessian grad
 #' @importFrom minqa bobyqa 
 #' @importFrom Matrix nearPD sparse.model.matrix Cholesky Matrix .updateCHMfactor tril
@@ -104,6 +104,10 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(length(class(data)) > 1) { 
     data <- as.data.frame(data)
   }
+  data_srt0 <- genUniqueVar(data, "srt")
+  row_name0 <- genUniqueVar(data, "row_name")
+  data[,data_srt0] <- 1:nrow(data)
+  data[,row_name0] <- rownames(data)
   if(!missing(acc0)) message("The argument acc0 is now deprecated and will be ignored.")
   if(nQuad <= 0) stop(paste0("The argument ", sQuote("nQuad"), " must be a positive integer."))
   if(!inherits(run, "logical")) stop(paste0("The argument ", sQuote("run"), " must be a logical."))
@@ -116,7 +120,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #this removes any  incomplete cases if they exist 
   if(any(is.na(data[ , c(all.vars(formula), weights)]))) {
     cl <- call("model.frame",
-               formula=formula(paste0("~", paste0(unique(c(all.vars(formula), weights)),collapse=" + "))),
+               formula=formula(paste0("~", paste0(unique(c(all.vars(formula), weights, data_srt0, row_name0)),collapse=" + "))),
                data=data)
     dt <- eval(cl, parent.frame(1L))
     warning(paste0("There were ", sum(nrow(data) - nrow(dt)), " rows with missing data. These have been removed."))
@@ -255,7 +259,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     for(i in (ncol(wgts0)-1):1) {
       wgts0[ , i] <- wgts0[ , i] * wgts0[ , i+1]
     }
-  }else{
+  } else {
     for(i in (ncol(wgtsC)-1):1) {
       wgtsC[ , i] <- wgtsC[ , i]/wgtsC[ , i+1]
     }
@@ -279,7 +283,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     # add the index for this level, when there is one
     if(i < length(nz)) {
       df$indexp1 <- dfC$indexp1 <- data[ , all_groups[i]]
-      
     }
     if(i > 1) {
       # for levels >1 data frame indexed by group name and values represent weights 
@@ -615,14 +618,13 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     
     # for backwards compatibility with EdSurvey 2.2.2
     env <- environment(bsq)
-    #covCon <- get("cConstructor", env)
-    #lmeVarDf <- get("covMat", environment(covCon))
     covMat <- env$lmeVarDF
+    # make a null function
     cc <- function() {
     }
     assign("cConstructor", value=cc, envir=env)
 
-
+    mu <- eta <- X%*%bhatq$b + Z%*%unlist(bhatq$ranef)
     # now build the results
     res <-list(lnlf=bsq, lnl= bhatq$lnl, coef = bhatq$b, ranefs=bhatq$ranef,
                SE = bhatq$seBetaRobust, 
@@ -633,12 +635,24 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
                is_adaptive=FALSE, sigma=bhatq$sigma, cov_mat=bhatq$varBetaRobust,
                ngroups=ngroups, varDF=varDF, varVC=varVC,var_theta=var_of_var,
                wgtStats=ngrpW, ranefMat = uMatList)
+    # for resorting resid, mu, eta, y
+    resort <-  sort(data[,data_srt0], index.return=TRUE)$ix
     if("resid" %in% names(bhatq)) {
-      res <- c(res, list(resid=bhatq$resid))
+      resid <- bhatq$resid[resort]
+      names(resid) <- data[,row_name0]
+      res <- c(res, list(resid=resid))
     }
     class(res) <- "WeMixResults"
+    mu <- mu[resort]
+    eta <- eta[resort]
+    y <- y[resort]
+    names(mu) <- names(eta) <- names(y) <- data[resort, row_name0]
+    attr(res,"resp") <- list(mu=mu,eta=eta,
+                             y=y,family=gaussian())
+    class(attr(res,"resp")) <- "WeMixLMResp"
     return(res)
-  }
+  } # if(is.null(family)){
+
   
   ##############################################################
   # 2b) Identify integration parameter for non linear models  #
@@ -742,13 +756,13 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #############################################
   
   # need to add this
-  tmp <- pirls_u(y,X,Z_mat,lambda,u=rep(0,length(PsiVec)),beta=est[1:ncol(X)],Whalf,mu_eta,
+  final_modes <- pirls_u(y,X,Z_mat,lambda,u=rep(0,length(PsiVec)),beta=est[1:ncol(X)],Whalf,mu_eta,
                  family,w1=weights[[1]]$w,PsiVec,Psi,l2_group_sizes,group_sizes,n_l2,n_top,
                  levels,q2,q3,by_group=FALSE)
-  u_vector <- tmp$modes
-  
-  # make est numeric
+  u_vector <- lambda%*%final_modes$modes
+  # est.chol is cholesky parameterization
   est.chol <- as.numeric(est)
+  # we'll make a parameter vector with vcov estimates
   est_tmp <- vector()
   l2_var <- unique(diag(Sigma))[1:q2]
   est_tmp <- c(est_tmp,l2_var)
@@ -789,9 +803,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # If any of variances got re mapped, re calculate hessian just inside the line, and 
   # share the limitation on WeMix estimation and the model wit the user.
   if (length(need_fix_vars) > 0){
-    warning(paste0("Group variances too small to estimate accurately. The estimated variance in the group level terms(s) ", paste(dQuote(names(vars)[need_fix_vars]), collapse=", "), " is near zero.",
-                   " Very low variance suggests that the data is not hierarchical and that a model without these levels should be considered.",
-                   " If this removes all groups then a non-hierarchical model, such as logistic regression, should be considered."))
     # calculate hessian, moving covariances to just larger values so the Hessian is internal
     hessian <- getGradHess(main_lnl, c(est[1:k], covs_and_vars+0.0002*need_fix_vars))$hess
   }
@@ -812,12 +823,73 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   varDF$fullGroup <- paste0(varDF$grp,ifelse(!is.na(varDF$var1),paste0(".",varDF$var1),""))
   
   varDF$vcov <- vars #re assign in variance from mix.
-
-  res <- list(lnlf=main_lnlR, lnl=lnl_final, coef=est[1:k], vars=vars,
+  res <- list(lnlf=main_lnlR, lnl=lnl_final, coef=est[1:k], 
+              vars=vars,
               call=call, levels=levels, ICC=ICC, CMODE=u_vector,
-              invHessian=hessian, is_adaptive=TRUE, ngroups=ngroups, varDF=varDF,
+              invHessian=hessian, is_adaptive=TRUE,
+              ngroups=ngroups, varDF=varDF,
               wgtStats=ngrpW)
+  theta <- getME(lme,"theta")
+  temp_Z <- getME(lme, "Ztlist")
+  #find out which level each applies to 
+  z_levels <- unique(lmeVarDF[lmeVarDF$fullGroup%in%names(temp_Z),c("fullGroup","level")])
+  Zlist <- list()
+  for (i in 2:levels){
+    z_names <- z_levels[z_levels$level==i,"fullGroup"]
+    Zlist[[i-1]] <- Matrix::t(do.call(rbind, temp_Z[z_names]))
+    #Zlist[[i-1]] <- t(as.matrix((Reduce(rbind, temp_Z[z_names]))))
+  }
+  bhatq <- list()
+  bhatq[["ranef"]] <- list()
+  u_vector2 <- u_vector[1:(n_l2*q2)]
+  tmp <- vector(mode="numeric")
+  for(i in 1:q2){
+    re_i <- u_vector2[seq(i,length(u_vector2),q2)]
+    tmp <- c(tmp,re_i)
+  }
+  bhatq[["ranef"]][[2]] <- tmp
+  if(levels==3){
+    u_vector3 <- u_vector[(n_l2*q2 + 1):length(u_vector)]
+    tmp <- vector(mode="numeric")
+    for(i in 1:q3){
+      re_i <- u_vector3[seq(i,length(u_vector3),q3)]
+      tmp <- c(tmp,re_i)
+    }
+    bhatq[["ranef"]][[3]] <- tmp
+  }
+  umat <- makeUMatList(bhatq,Zlist,theta)
+  ranef_list <- list()
+  for (l in 2:levels) {
+    names <- rep(rownames(umat[[l-1]]),nRE[[l-1]])
+    vals <- as.matrix(as.vector(t(umat[[l-1]])))
+    ranef_list[[l]] <- vals
+    rownames(ranef_list[[l]]) <- names
+  }
+  sandwich_est <- makeSandwich(list(coef=est[1:k],vars=vars,
+                                    invHessian=hessian,lnlf=main_lnlR))
+  SE <- sandwich_est$se[1:k]
+  cov_mat <- sandwich_est$VC[1:k,1:k]
+  var_theta <- sandwich_est$se[-(1:k)]
+  res <- list(lnlf=main_lnlR, lnl=lnl_final, coef=est[1:k], ranefs=ranef_list,
+              SE=SE, vars=vars, theta=est.chol[-(1:k)], X=X, y=y, Z=Z_mat,
+              call=call, levels=levels, ICC=ICC, CMODE = final_modes$modes,
+              invHessian=hessian, is_adaptive=TRUE, sigma = 1,
+              ngroups=ngroups, varDF=varDF, varVC=varDF$vcov, 
+              cov_mat=cov_mat, var_theta=var_theta,
+              wgtStats=ngrpW, ranefMat=umat)
   class(res) <- "WeMixResults"
+  mu <- final_modes$mu
+  eta <- final_modes$eta
+  # for resorting resid, mu, eta, y
+  resort <-  sort(data[,data_srt0], index.return=TRUE)$ix
+  mu <- mu[resort]
+  eta <- eta[resort]
+  y <- y[resort]
+  names(mu) <- names(eta) <- names(y) <- data[resort, row_name0]
+  attr(res,"resp") <- list(mu=mu,eta=eta,
+                           y=y,family=family,wtres=final_modes$wtres,
+                           wt=final_modes$wt)
+  class(attr(res,"resp")) <- "WeMixGLMResp"
   return(res)
 }
 
@@ -831,12 +903,15 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
   LtZt <- Matrix::t(lambda)%*%Matrix::t(Z_mat)
   u <- u*1
   u0 <- u
-  eta <- Xb + as.vector(Matrix::crossprod(LtZt, u))
+  #eta <- Xb + as.vector(Matrix::crossprod(LtZt, u))
+  eta <- Xb + as.vector(Matrix::t(LtZt) %*% u)
   mu <- family$linkinv(eta)
   
-  L <- Cholesky(Matrix(Matrix::tcrossprod(LtZt)), perm=FALSE, LDL=FALSE, Imult=1)
+  #L <- Cholesky(Matrix(Matrix::tcrossprod(LtZt)), perm=FALSE, LDL=FALSE, Imult=1)
+  L <- Cholesky(Matrix((LtZt %*% Matrix::t(LtZt))), perm=FALSE, LDL=FALSE, Imult=1)
   updatemu <- function(uu) {
-    eta[] <<- as.numeric(Xb + as.vector(Matrix::crossprod(LtZt, uu)))
+    #eta[] <<- as.numeric(Xb + as.vector(Matrix::crossprod(LtZt, uu)))
+    eta[] <<- as.numeric(Xb + as.vector(Matrix::t(LtZt) %*% uu))
     mu[] <<- family$linkinv(eta)
     sum(family$dev.resids(y, mu, wt=w1)) + sum(PsiVec*uu^2)
   }
@@ -851,7 +926,8 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
     
     # update Cholesky decomposition - if fitting unweighted model,
     # we could use the more efficient update function if Psi is I
-    L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
+    #L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
+    L <- Cholesky(LtZtMWhalf %*% Matrix::t(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
     # update weighted residuals
     wtres <- diag(Whalf)*(y - mu)
     
@@ -886,57 +962,54 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
   ucden <- updatemu(u)
   Whalf@x <- sqrt(w1 / family$variance(mu))
   mu_eta@x <- family$mu.eta(eta)
+  wtres <- diag(Whalf)*(y - mu)
   LtZtMWhalf <- as(LtZt%*%(mu_eta*diag(Whalf)),"sparseMatrix")
   # update Cholesky decomposition
-  L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
+  #L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
+  L <- Cholesky(LtZtMWhalf %*% Matrix::t(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
   L <- as(L,"sparseMatrix")
   
   llh <- -0.5*family$aic(y,rep.int(1,length(y)),mu,wt=w1,dev=NULL) - 0.5*sum(PsiVec*u^2) - 
-    Matrix::determinant((L/sqrt(PsiVec))^PsiVec)$modulus
+         Matrix::determinant((L/sqrt(PsiVec))^PsiVec)$modulus
   
   det_by_group <- NULL
   # new args i need to add: l2_group_sizes,group_sizes,n_l2,n_top,levels
   if(by_group){
-
     llh <- llh_l2 <- l2_group_L <- l3_group_L <- vector(mode="numeric")
     log_y_u <- rowsum(family$lnl(y,mu,w1,sd=NULL),rep(1:n_l2,l2_group_sizes))
-
     for(i in 1:n_l2){
       group_Psi <- PsiVec[((i-1)*q2 + 1):(i*q2)]
       l2_group_L[i] <- Matrix::determinant(Matrix((L[((i-1)*q2 + 1):(i*q2),((i-1)*q2 + 1):(i*q2)]/sqrt(group_Psi))^group_Psi))$modulus
       group_u <- u[((i-1)*q2 + 1):(i*q2)]
       llh_l2[i] = log_y_u[i] - 0.5*sum(group_Psi*group_u^2) 
     }
-    
     if(levels == 2){
       llh <- llh_l2 - l2_group_L
       det_by_group <- l2_group_L
-    }else{
+    } else {
       l3_Psi <- PsiVec[((q2*n_l2)+1):length(PsiVec)]
       l2_Psi <- PsiVec[1:(q2*n_l2)]
       llh_tmp <- rowsum(llh_l2,rep(1:n_top,group_sizes))
       l3_u <- u[((q2*n_l2)+1):length(u)]
       l2_L <- L[1:(n_l2*q2),1:(n_l2*q2)]
       l3_L <- L[((n_l2*q2)+1):nrow(L),((n_l2*q2)+1):nrow(L)]
-      l2_l3_L <- L[((n_l2*q2)+1):nrow(L),(1:n_l2*q2)]
-
+      l2_l3_L <- L[((n_l2*q2)+1):nrow(L),(1:(n_l2*q2))]
       for(n in 1:n_top){
         l3_comp <- l3_L[((n-1)*q3 + 1):(n*q3),((n-1)*q3 + 1):(n*q3)]
-        l2_comp <- l2_L[l2_l3_L[n,]!=0,l2_l3_L[n,]!=0]
-        l2_l3_comp <- l2_l3_L[n,][l2_l3_L[n,]!=0]
-        col.tmp <- matrix(0,ncol=q3,nrow=group_sizes[n])
+        l2_comp <- l2_L[l2_l3_L[((n-1)*q3 + 1),]!=0,l2_l3_L[((n-1)*q3 + 1),]!=0]
+        l2_l3_comp <- l2_l3_L[((n-1)*q3 + 1):(n*q3),][l2_l3_L[((n-1)*q3 + 1):(n*q3),]!=0]
+        col.tmp <- matrix(0,ncol=q3,nrow=group_sizes[n]*q2)
         group_L <- Matrix(cbind(rbind(l2_comp,l2_l3_comp),rbind(col.tmp,l3_comp)))
         l3_group_Psi <- c(l2_Psi[l2_l3_L[n,]!=0],l3_Psi[((n-1)*q3 + 1):(n*q3)])
         l3_group_L[n] <- Matrix::determinant((group_L/sqrt(l3_group_Psi))^l3_group_Psi)$modulus
         l3_group_u <- l3_u[((n-1)*q3 + 1):(n*q3)]
         llh[n] <- llh_tmp[n] - 0.5*sum(l3_Psi[((n-1)*q3 + 1):(n*q3)]*l3_group_u^2) - l3_group_L[n]
-        
       }
       det_by_group <- l3_group_L
     }
   }
-  
-  return(list(modes=u,hess=L,logLik=llh,det_by_group=det_by_group))
+  return(list(modes=u,hess=L,logLik=llh,det_by_group=det_by_group,
+              mu=mu,eta=eta,wtres=wtres,wt=w1))
 }
 
 makeAdaptedPts <- function(muHat,R,nQuad,levels,q2,q3,n_l2,n_top){
@@ -1131,6 +1204,7 @@ main_lnl_container <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
       # Don't do all the weighting here - do it once the point values have been
       # summed. Only weighting that should be done here is applying conditional
       # level 1 weights. 
+
       glm_llh <- family$lnl(y,mu,w1c,sd=NULL)
       norm_llh_l2 <- -0.5*rowsum(as.matrix(new_l2^2),group=rep(1:n_l2,each=q2))
       llh_l2_point <- rowsum(glm_llh,group=rep(1:n_l2,times=l2_group_sizes)) + norm_llh_l2
@@ -1200,12 +1274,10 @@ lnl_by_group <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
     }else{
       lambda <- updateLambda(lambda,vcov,q2,q3,n_l2,n_top)
     }
-
     postModeVar <- pirls_u(y,X,Z_mat,lambda,u=old_u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
                            l2_group_sizes,group_sizes,n_l2,n_top,levels,q2,q3,by_group=TRUE)
  
     muHat <- postModeVar$modes
-    
     L <- postModeVar$hess
     R <- Matrix::t(as(L,"sparseMatrix"))
     
@@ -1229,7 +1301,6 @@ lnl_by_group <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
       # TO-DO: figure out more elegant way to do this - idea is summing up the point
       # values within a single level 3 group (i.e. sum up the 'l' level 2 points at
       # level 3 point 'k')
-
       if(levels == 3){
         w3 <- weights[[3]]$w
         new_l3 <- adapted_points$adapt_l3

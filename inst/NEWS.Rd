@@ -1,9 +1,15 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
-\section{Changes in version 4.0.900x}{
+\section{Changes in version 4.0.2}{
+  \subsection{improvements}{
+    \itemize{
+      \item there is now a \code{predict} function.
+    }
+  }
   \subsection{BUG FIXES}{
     \itemize{
+      \item the latest Matrix package (unclear what version caused the issue, maybe 1.6) caused a bug that is fixed by this version of WeMix.
       \item the \code{haven} package doesn't always import data in formats the \code{Matrix} package recognizes. Columns that should be numeric are now cast as numeric before they are used, which may prevent this issue. Thanks to Emilie Franck for pointing this out.
       \item the \code{mix} function documentation now notes that the coefficient standard errors are always cluster robust (CR-0) estimates. Thanks to Francis Huang for pointing out that it previously mentioned a non-existent argument.
       \item the \code{mix} function nolonger fails if the \code{lme4::lmer} fit had a variable of exactly zero because \code{bobyqa} threw an error. Thanks fo Charles Blankenship for identifying this bug.

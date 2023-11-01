@@ -57,7 +57,6 @@ summary.WeMixResults <- function(object, ...) {
   # add variance estimates
   colnames(varsmat) <- c("Level", "Group", "Name", "Variance", "Std. Error", "Std.Dev.")
   for(li in 2:x0$levels) {
-    #browser()
     vc <- as.matrix(x0$varVC[[li]])
     cr <- cov2cor(vc)
     if(ncol(vc)>1) {
@@ -76,6 +75,122 @@ summary.WeMixResults <- function(object, ...) {
   
   class(object) <- "summaryWeMixResults"
   return(object)
+}
+
+#' @export
+predict.WeMixResults <- function(object, newdata = NULL, type=c("link","response"), allow.new.levels=FALSE) {
+  type <- match.arg(type)
+  family <- attr(object,"resp")$family
+  b <- object$coef
+  if (is.null(newdata)) {
+    if (type == "response") {
+      return(attr(object,"resp")$mu)
+    } else {
+      return(attr(object,"resp")$eta)
+    }
+  } else {
+    form <- as.formula(formula(getCall(object)))
+    response <- as.name(form[[2]])
+    if (!deparse(response) %in% colnames(newdata)) {
+      newdata[[response]] <- 0
+    }
+    lForm <- lFormula(formula=form, data=newdata)
+    X_new <- lForm$X
+    Zt_new <- lForm$reTrms$Zt
+    grps <- names(object$ranefMat)
+    ui_offset <- 0
+    u <- c()
+    for(gi in 1:length(grps)) {
+      g <- grps[gi]
+      if( any(!newdata[,g] %in% unique(rownames(object$ranefMat[[g]])))){
+        if(!allow.new.levels) {
+          stop("found new levels in ", g, " try setting the argument allow.new.levels to TRUE")
+        }
+      }
+      ui_raw <- object$ranefMat[[gi]]
+      ui <- rep(0, ncol(ui_raw) * length(unique(newdata[,g])))
+      names(ui) <- rownames(Zt_new)[ui_offset + 1:length(ui)]
+      # adjust the offset to account for having filled these positions
+      ui_offset <- ui_offset + length(ui)
+      for(ii in 1:nrow(ui_raw)) {
+        if(sum(names(ui) == rownames(ui_raw)[ii]) == ncol(ui_raw)) {
+          ui[names(ui) == rownames(ui_raw)[ii]] <- unlist(ui_raw[ii,])
+        }
+      }
+      # append ui to the end of the u vector
+      u <- c(u, ui)
+    }
+
+    if (any(!colnames(X_new) %in% names(b))) {
+      notinX <- colnames(X_new)[!colnames(X_new) %in% names(b)]
+      stop("cannot find columns in X: ", pasteItems(notinX), ".")
+    }
+    if (any(!names(b) %in% colnames(X_new))) {
+      notinb <- names(b)[!names(b) %in% colnames(X_new)]
+      stop("cannot find coefficients in b: ", pasteItems(notinb), ".")
+    }
+    if (any(!names(lForm$reTrms$cnms) %in% names(object$ranefMat))) {
+      notinZ <- names(object$ranefMat)[!names(object$ranefMat) %in% names(lForm$reTrms$cnms)]
+      stop("cannot find columns in Z: ", pasteItems(notinZ), ".")
+    }
+    if (any(!names(object$ranefMat) %in% names(lForm$reTrms$cnms))) {
+      notinre <- names(object$ranefMat)[!names(object$ranefMat) %in% names(lForm$reTrms$cnms)]
+      stop("cannot find random effects in ranefMat: ", pasteItems(notinre), ".")
+    }
+    eta <- as.vector(X_new %*% object$coef + Matrix::t(Zt_new) %*% u)
+    if (type == "response") {
+      res <- family$linkinv(eta)
+    } else {
+      res <- eta
+    }
+    df_res <- data.frame(res=res,
+                         row_name=rownames(X_new))
+    df_all <- data.frame(row_name=rownames(newdata),
+                         order=1:nrow(newdata))
+    df_m <- merge(df_res, df_all, by="row_name", all.x=TRUE, all.y=TRUE)
+    res <- df_m$res
+    names(res) <- df_m$row_name
+    res <- res[sort(df_m$order, index.return=TRUE)$ix]
+    return(res)
+  }
+}
+
+isGLMM.WeMixResults <- function(object) {
+  as.logical(attr(object,"resp")$family$family %in% c("binomial","poisson"))
+} 
+
+#' @importFrom lme4 isGLMM
+#' @export
+residuals.WeMixResults <- function(object,
+                             type = if(isGLMM(object)) "deviance" else "response",
+                             ...) {
+  if (isGLMM(object)) {
+    residuals(attr(object,"resp"), type,...)
+  }else { 
+    return(object$resid)
+  }
+}
+
+# TO-DO: same thing 
+#' @method residuals WeMixGLMResp
+residuals.WeMixGLMResp <- function(object, type = c("deviance", "pearson",
+                                               "working", "response"),
+                              ...) {
+  type <- match.arg(type)
+  y <- object$y
+  mu <- object$mu
+  eta <- object$eta
+  family <- object$family
+  wt <- object$wt
+  mu_eta <- family$mu.eta(eta)
+  wrkResids <- (y - mu)/mu_eta
+  switch(type,
+         deviance = y - sqrt(family$dev.resids(y,mu,wt)),
+         pearson = object$wtres,
+         working = (y - mu)/mu_eta,
+         response = y - mu
+  )
+  
 }
 
 # This helper function prints WeMix Wald Test Resuls.
@@ -418,3 +533,39 @@ nearPD2 <- function(X, tol=400, warn="") {
   return(X)
 }
 
+# turns a vector into a properyly formatted list for showing the user
+# @param vector a vector of items to paste
+# @param final the word to put after the serial comma and the final element
+# @
+# examples:
+# pasteItems(c())
+# # NULL
+# pasteItems(c("A"))
+# # [1] "A"
+# pasteItems(c("A", "B"))
+# # [1] "A and B"
+# pasteItems(c("A", "B", "C"))
+# # [1] "A, B, and C"
+# from EdSurvey 4.0.0
+# @author Paul Bailey
+pasteItems <- function(vector, final = "and") {
+  # no need to do anything if there is one or fewer elements
+  if (length(vector) <= 1) {
+    return(vector)
+  }
+  if (length(vector) == 2) {
+    return(paste0(vector[1], " ", final, " ", vector[2]))
+  }
+  v <- vector[-length(vector)]
+  f <- vector[length(vector)]
+  return(paste0(paste(v, collapse = ", "), ", ", final, " ", f))
+}
+
+# generate a variable not on the dataframe already by adding letters to the end unit
+# a name not on the data frame is available
+genUniqueVar <- function(df, new_var_name="unique") {
+  while(new_var_name %in% colnames(df)) {
+    new_var_name <- paste0(new_var_name,sample(letters,1))
+  }
+  return(new_var_name)
+}

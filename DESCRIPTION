@@ -1,6 +1,6 @@
 Package: WeMix
-Version: 4.0.9002
-Date: 2023-07-17
+Version: 4.0.2
+Date: 2023-10-31
 Title: Weighted Mixed-Effects Models Using Multilevel Pseudo Maximum
         Likelihood Estimation
 Authors@R: c(person("Emmanuel", "Sikali", role="pdr", email = "Emmanuel.Sikali@ed.gov"),
@@ -12,7 +12,7 @@ Authors@R: c(person("Emmanuel", "Sikali", role="pdr", email = "Emmanuel.Sikali@e
              person("Steve","Walker",role="cph",comment="lme4pureR PIRLS function"),
              person("Doug","Bates",role="cph",comment="lme4pureR PIRLS function"),
              person("Eric", "Buehler", role="ctb"),
-             person("Christian", "Kjeldsen", role="ctb"))
+             person(c("Christian", "Christrup"), "Kjeldsen", role="ctb"))
 Maintainer: Paul Bailey <pbailey@air.org>
 Depends: lme4, R (>= 3.5.0)
 Imports: numDeriv, Matrix (>= 1.5-4.1), methods, minqa, matrixStats
@@ -31,7 +31,7 @@ URL: https://american-institutes-for-research.github.io/WeMix/
 BugReports: https://github.com/American-Institutes-for-Research/WeMix/issues
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2023-07-17 20:48:02 UTC; pbailey
+Packaged: 2023-11-01 15:42:55 UTC; pbailey
 Author: Emmanuel Sikali [pdr],
   Paul Bailey [aut, cre],
   Blue Webb [aut],
@@ -41,4 +41,4 @@ Author: Emmanuel Sikali [pdr],
   Steve Walker [cph] (lme4pureR PIRLS function),
   Doug Bates [cph] (lme4pureR PIRLS function),
   Eric Buehler [ctb],
-  Christian Kjeldsen [ctb]
+  Christian Christrup Kjeldsen [ctb]

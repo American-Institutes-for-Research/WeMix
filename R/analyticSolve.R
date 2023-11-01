@@ -537,9 +537,10 @@ analyticSolve <- function(y, X, Zlist, Zlevels, weights, weightsC=weights, group
                   lndetLz0=lndetLzg[[giuf]])
         tryCatch(lnli[gi] <- bwi(v=v, verbose=verbose, beta=b, sigma=sigma, robustSE=FALSE)$lnl,
                  error= function(e) {
+                   print(e)
                    lnli[gi] <<- NA
                  })
-        if( abs(lnli2[gi] - lnli[gi]) > 0.001) {
+        if( is.na(lnli[gi]) || abs(lnli2[gi] - lnli[gi]) > 0.001) {
           # sometimes Matrix::qr tries to solve a singular system and fails
           # normally base::qr works in these cases, so use that instead
           bwi <- analyticSolve(y=y[sgi], X[sgi,,drop=FALSE],
@@ -661,7 +662,11 @@ qr_0 <- function(X, allowPermute=FALSE) {
     return(base::qr(X))
   }
   # try to use Matrix
-  qr1 <- Matrix::qr(X)
+  tryCatch(qr1 <- Matrix::qr(X),
+    warning=function(w) {
+      qr1 <<- base::qr(X)
+    }
+  )
   if(allowPermute || inherits(qr1,"qr")) {
     # if allowPermute (allow Matrix::qr to use permutations) or this is a base::qr, just return
     return(qr1)
