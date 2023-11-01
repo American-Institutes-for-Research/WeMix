@@ -31,7 +31,7 @@ URL: https://american-institutes-for-research.github.io/WeMix/
 BugReports: https://github.com/American-Institutes-for-Research/WeMix/issues
 Encoding: UTF-8
 NeedsCompilation: no
-Packaged: 2023-11-01 15:42:55 UTC; pbailey
+Packaged: 2023-11-01 16:06:03 UTC; pbailey
 Author: Emmanuel Sikali [pdr],
   Paul Bailey [aut, cre],
   Blue Webb [aut],
