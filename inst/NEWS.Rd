@@ -1,7 +1,7 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
-\section{Changes in version 4.0.2}{
+\section{Changes in version 4.0.3}{
   \subsection{improvements}{
     \itemize{
       \item there is now a \code{predict} function.

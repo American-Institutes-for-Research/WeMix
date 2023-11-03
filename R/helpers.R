@@ -77,8 +77,9 @@ summary.WeMixResults <- function(object, ...) {
   return(object)
 }
 
+#' @method predict WeMixResults
 #' @export
-predict.WeMixResults <- function(object, newdata = NULL, type=c("link","response"), allow.new.levels=FALSE) {
+predict.WeMixResults <- function(object, newdata = NULL, type=c("link","response"), allow.new.levels=FALSE, ...) {
   type <- match.arg(type)
   family <- attr(object,"resp")$family
   b <- object$coef
@@ -155,8 +156,10 @@ predict.WeMixResults <- function(object, newdata = NULL, type=c("link","response
   }
 }
 
-isGLMM.WeMixResults <- function(object) {
-  as.logical(attr(object,"resp")$family$family %in% c("binomial","poisson"))
+#' @method isGLMM WeMixResults
+#' @export
+isGLMM.WeMixResults <- function(x, ...) {
+  as.logical(attr(x,"resp")$family$family %in% c("binomial","poisson"))
 } 
 
 #' @importFrom lme4 isGLMM
