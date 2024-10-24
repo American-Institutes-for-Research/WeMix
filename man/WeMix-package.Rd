@@ -2,6 +2,7 @@
 % Please edit documentation in R/weMix-package.R
 \docType{package}
 \name{WeMix-package}
+\alias{WeMix}
 \alias{WeMix-package}
 \title{Estimate Weighted Mixed-Effects Models}
 \description{
@@ -36,4 +37,33 @@ of the Royal Statistical Society: Series A (Statistics in Society), 169, 805-827
 https://doi.org/10.1111/j.1467-985X.2006.00426.x
 
 Bates, D. & Pinheiro, J. C. (1998). Computational Methods for Multilevel Modelling. Bell labs working paper.
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://american-institutes-for-research.github.io/WeMix/}
+  \item Report bugs at \url{https://github.com/American-Institutes-for-Research/WeMix/issues}
+}
+
+}
+\author{
+\strong{Maintainer}: Paul Bailey \email{pbailey@air.org}
+
+Authors:
+\itemize{
+  \item Blue Webb
+  \item Claire Kelley
+  \item Trang Nguyen
+  \item Huade Huo
+}
+
+Other contributors:
+\itemize{
+  \item Emmanuel Sikali \email{Emmanuel.Sikali@ed.gov} [project director]
+  \item Steve Walker (lme4pureR PIRLS function) [copyright holder]
+  \item Doug Bates (lme4pureR PIRLS function) [copyright holder]
+  \item Eric Buehler [contributor]
+  \item Christian Christrup Kjeldsen [contributor]
+}
+
 }

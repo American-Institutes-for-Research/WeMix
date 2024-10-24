@@ -815,12 +815,11 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   nobs <- nrow(X)
   names(nobs) <- "Number of obs"
   ngroups <- c(nobs, ngrp)
-  
   #set up the variance covariance matrix 
-  varDF <- lmeVarDF[,c("grp", "var1", "var2", "vcov", "ngrp", "level")]
+  varDF <- lmeVarDF[,c("grp", "var1", "var2", "vcov", "ngrp", "level", "fullGroup")]
 
   varDF$vcov <- 0
-  varDF$fullGroup <- paste0(varDF$grp,ifelse(!is.na(varDF$var1),paste0(".",varDF$var1),""))
+  #varDF$fullGroup <- paste0(varDF$grp,ifelse(!is.na(varDF$var1),paste0(".",varDF$var1),""))
   
   varDF$vcov <- vars #re assign in variance from mix.
   res <- list(lnlf=main_lnlR, lnl=lnl_final, coef=est[1:k], 
@@ -903,20 +902,21 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
   LtZt <- Matrix::t(lambda)%*%Matrix::t(Z_mat)
   u <- u*1
   u0 <- u
-  #eta <- Xb + as.vector(Matrix::crossprod(LtZt, u))
   eta <- Xb + as.vector(Matrix::t(LtZt) %*% u)
   mu <- family$linkinv(eta)
   
-  #L <- Cholesky(Matrix(Matrix::tcrossprod(LtZt)), perm=FALSE, LDL=FALSE, Imult=1)
   L <- Cholesky(Matrix((LtZt %*% Matrix::t(LtZt))), perm=FALSE, LDL=FALSE, Imult=1)
   updatemu <- function(uu) {
-    #eta[] <<- as.numeric(Xb + as.vector(Matrix::crossprod(LtZt, uu)))
     eta[] <<- as.numeric(Xb + as.vector(Matrix::t(LtZt) %*% uu))
     mu[] <<- family$linkinv(eta)
     sum(family$dev.resids(y, mu, wt=w1)) + sum(PsiVec*uu^2)
   }
 
   olducden <- updatemu(u*0)
+  # this is used here to find the determinant of a Cholesky matrix /sqrt(psi) ^ psi
+  det_chol_psi <- function(gL,psi) {
+    log(prod((diag(gL)/sqrt(psi))^psi))
+  }
   
   while(pirls & iter <= 500){
     mu_eta@x <- family$mu.eta(eta)
@@ -979,7 +979,8 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
     log_y_u <- rowsum(family$lnl(y,mu,w1,sd=NULL),rep(1:n_l2,l2_group_sizes))
     for(i in 1:n_l2){
       group_Psi <- PsiVec[((i-1)*q2 + 1):(i*q2)]
-      l2_group_L[i] <- Matrix::determinant(Matrix((L[((i-1)*q2 + 1):(i*q2),((i-1)*q2 + 1):(i*q2)]/sqrt(group_Psi))^group_Psi))$modulus
+      group_L <- L[((i-1)*q2 + 1):(i*q2),((i-1)*q2 + 1):(i*q2),drop=FALSE]
+      l2_group_L[i] <- det_chol_psi(group_L, group_Psi)
       group_u <- u[((i-1)*q2 + 1):(i*q2)]
       llh_l2[i] = log_y_u[i] - 0.5*sum(group_Psi*group_u^2) 
     }
@@ -997,11 +998,14 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
       for(n in 1:n_top){
         l3_comp <- l3_L[((n-1)*q3 + 1):(n*q3),((n-1)*q3 + 1):(n*q3)]
         l2_comp <- l2_L[l2_l3_L[((n-1)*q3 + 1),]!=0,l2_l3_L[((n-1)*q3 + 1),]!=0]
-        l2_l3_comp <- l2_l3_L[((n-1)*q3 + 1):(n*q3),][l2_l3_L[((n-1)*q3 + 1):(n*q3),]!=0]
+        l2_l3_comp <- l2_l3_L[((n-1)*q3 + 1):(n*q3),]
+        if(any(c(inherits(l2_l3_comp, "matrix"), inherits(l2_l3_comp, "Matrix"))) ) {
+          l2_l3_comp <- matrix(l2_l3_comp[l2_l3_comp!=0], nrow=nrow(l2_l3_comp))
+        }
         col.tmp <- matrix(0,ncol=q3,nrow=group_sizes[n]*q2)
         group_L <- Matrix(cbind(rbind(l2_comp,l2_l3_comp),rbind(col.tmp,l3_comp)))
         l3_group_Psi <- c(l2_Psi[l2_l3_L[n,]!=0],l3_Psi[((n-1)*q3 + 1):(n*q3)])
-        l3_group_L[n] <- Matrix::determinant((group_L/sqrt(l3_group_Psi))^l3_group_Psi)$modulus
+        l3_group_L[n] <- det_chol_psi(group_L, l3_group_Psi)
         l3_group_u <- l3_u[((n-1)*q3 + 1):(n*q3)]
         llh[n] <- llh_tmp[n] - 0.5*sum(l3_Psi[((n-1)*q3 + 1):(n*q3)]*l3_group_u^2) - l3_group_L[n]
       }

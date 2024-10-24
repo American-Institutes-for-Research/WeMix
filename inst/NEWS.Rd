@@ -1,6 +1,15 @@
 \name{NEWS}
 \title{NEWS for WeMix}
 
+\section{Changes in version 4.0.4}{
+  \subsection{BUG FIXES}{
+    \itemize{
+      \item fixed bug in summary when there are two random effects at the lowest grouping level. thanks to Francis Huang for identifying this issue.
+      \item fixed handling of non-integer weights which could result in a fit not proceeding in some cases.
+    }
+  }
+}
+
 \section{Changes in version 4.0.3}{
   \subsection{improvements}{
     \itemize{

@@ -52,27 +52,48 @@ summary.WeMixResults <- function(object, ...) {
   colnames(object$coef)[2:3] <- c("Std. Error", "t value")
   rownames(object$coef) <- names(x0$coef)
   # build the var mat output
-  varsmat <- varDF[is.na(x0$varDF$var2),c("level","grp", "var1","vcov","SEvcov")]
+  varsmat <- varDF[is.na(x0$varDF$var2),c("var1","level","grp", "fullGroup","vcov","SEvcov")]
   varsmat$st <- sqrt(varsmat$vcov)
   # add variance estimates
-  colnames(varsmat) <- c("Level", "Group", "Name", "Variance", "Std. Error", "Std.Dev.")
+  colnames(varsmat) <- c("NameName", "Level", "Group", "Name", "Variance", "Std. Error", "Std.Dev.")
+  varsmat$Name <- gsub("[.]",":",varsmat$Name)
   for(li in 2:x0$levels) {
     vc <- as.matrix(x0$varVC[[li]])
     cr <- cov2cor(vc)
+    varsmatlevel <- varsmat[varsmat$Level==li,]
     if(ncol(vc)>1) {
       for(i in 2:ncol(cr)) {
         for(j in 1:(i-1)){
-          varsmat[varsmat$Level==li & varsmat$Name==rownames(cr)[i],paste0("Corr",j)] <- cr[i,j]
+          # For now just do the names differently based on whether it's a linear model or not;
+          # ultimately should try to standardize naming
+          if("family" %in% names(object$call)) {
+            level_namei <- paste0(varsmatlevel$Group[1], ":",
+                                  varsmatlevel$NameName[i])
+            level_namej <- paste0(varsmatlevel$Group[1], ":",
+                                  varsmatlevel$NameName[j], ":",
+                                  varsmatlevel$NameName[i])
+          } else {
+            level_namei <- varsmatlevel$NameName[i]
+            level_namej <- varsmatlevel$NameName[j]
+          }
+          
+          if(any(level_namei %in% rownames(cr), level_namej %in% rownames(cr))) {
+            varsmatlevel[i, paste0("Corr",j)] <- cr[which(rownames(cr) == level_namei),which(rownames(cr) == level_namej)]
+            varsmat[varsmat$Level==li,paste0("Corr",j)] <- NA
+          }
         }
       }
     }
+    varsmat[varsmat$Level==li,] <- varsmatlevel 
   }
-
+  varsmat$Name <- varsmat$NameName
+  varsmat$NameName <- NULL
   object$varsmat <- varsmat
   #this is important for compatibility  with mixed.sdf
-  object$vars  <- varsmat[,4:6]
-  rownames(object$vars)  <- names(x0$vars)
-  
+  object$vars  <- varsmat[,c("Variance", "Std. Error", "Std.Dev.")]
+  x0names <- names(x0$vars)
+  x0names <- x0names[!grepl(":.*:", x0names)]
+  rownames(object$vars)  <- x0names
   class(object) <- "summaryWeMixResults"
   return(object)
 }
@@ -469,14 +490,10 @@ makeSandwich <- function(fittedModel) {
   colnames(SE) <- rownames(SE)<-names(par)
   se <- sqrt(diag(SE)) 
 
-  #return NA for obs with variance below threshold 
-  se[which(log(fittedModel$vars) < -3.6) + length(fittedModel$coef) ] <- NA
   diag(SE) <- se^2 
   names(se) <- colnames(SE)
   
   return(list(VC=SE,se=se)) 
- 
-
 }
 
 # TRUE if x has no zeros in it. False if it does have a zero.

@@ -28,6 +28,5 @@
 #' https://doi.org/10.1111/j.1467-985X.2006.00426.x
 #' 
 #' Bates, D. & Pinheiro, J. C. (1998). Computational Methods for Multilevel Modelling. Bell labs working paper.
-#' @docType package
 #' @name WeMix-package
-NULL
+"_PACKAGE"

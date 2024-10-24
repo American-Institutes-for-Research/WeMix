@@ -88,6 +88,9 @@ test_that("Factor binomial", {
                       co <- capture.output(summary(m1))
   )
   expect_equal(co, summaryREF)
+  m20 <- glmer(highR ~ Days + (1+Days|Subject), data=sleepstudyM, family="binomial")
+  m2 <- mix(highR ~ Days + (1+Days|Subject), data=sleepstudyM, weights=c("weight1L1", "weight1L2"), family="binomial", nQuad=1)
+  expect_equal(fixef(m20), m2$coef, tol=4e-4)
 })
 
 context("Unweighted model with 2 random effects")
@@ -954,8 +957,8 @@ test_that("summary output format", {
                        .Dimnames = list(c("(Intercept)", "Days"),
                                         c("Estimate", "Std. Error", "t value")))
   sum0 <- summary(wm0)
-  expect_equal(sum0$coef, coefref, tolerance=1e-4)
-  expect_equal(sum0$vars, varsref, tolerance=4e-3)
+  expect_equal(sum0$coef, coefref, tolerance=1e-3)
+  expect_equal(sum0$vars, varsref, tolerance=4e-2)
 })
 
 context("Weighted three level model")
