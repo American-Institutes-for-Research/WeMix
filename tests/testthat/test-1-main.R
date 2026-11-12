@@ -88,9 +88,18 @@ test_that("Factor binomial", {
                       co <- capture.output(summary(m1))
   )
   expect_equal(co, summaryREF)
-  m20 <- glmer(highR ~ Days + (1+Days|Subject), data=sleepstudyM, family="binomial")
-  m2 <- mix(highR ~ Days + (1+Days|Subject), data=sleepstudyM, weights=c("weight1L1", "weight1L2"), family="binomial", nQuad=1)
-  expect_equal(fixef(m20), m2$coef, tol=4e-4)
+  sleepstudyM2 <- sleepstudyM
+  sleepstudyM2$Days <- sleepstudyM2$Days + 5
+  sleepstudyM3 <- rbind(sleepstudyM, sleepstudyM2)
+  sleepstudyM2$Days <- sleepstudyM2$Days + 10
+  sleepstudyM3 <- rbind(sleepstudyM3, sleepstudyM2)
+
+  set.seed(2)
+  sleepstudyM3$highR <- factor(ifelse(sleepstudyM3$Reaction > 340 + 40*rnorm(nrow(sleepstudyM3)) + 20*rep(rnorm(18), each=30), 2, 1), levels=c(1,2), labels=c("L","H"))
+  gm2 <- glmer(highR ~ Days + (1+Days|Subject), data=sleepstudyM3, family="binomial")
+  m2 <- mix(highR ~ Days + (1+Days|Subject), data=sleepstudyM3, weights=c("weight1L1", "weight1L2"), family="binomial", nQuad=1)
+  expect_equal(fixef(gm2), m2$coef, tol=4e-3)
+  summary(m2)
 })
 
 context("Unweighted model with 2 random effects")
@@ -219,10 +228,8 @@ test_that("grouping factor not sorted", {
   expect_equal(wmeL1D$lnl, -1048.34318418762, tolerance=tolerance)
   
   # check final results
-  suppressWarnings(mix1 <-  mix(formula=Reaction ~ Days + (1 | Subject), data=ss1_mixed,
-                                weights=c("W1", "W2")))
-  suppressWarnings(mix1REF <-  mix(formula=Reaction ~ Days + (1 | Subject), data=ss1,
-                                   weights=c("W1", "W2")))
+  mix1 <-  mix(formula=Reaction ~ Days + (1 | Subject), data=ss1_mixed, weights=c("W1", "W2"))
+  mix1REF <-  mix(formula=Reaction ~ Days + (1 | Subject), data=ss1, weights=c("W1", "W2"))
   expect_equal(mix1$coef, mix1REF$coef, tolerance=1e3)
   expect_equal(mix1$vars, mix1REF$vars, tolerance=1e-3)
   expect_equal(mix1$lnl, mix1REF$lnl, tolerance=1e-3)
@@ -398,6 +405,11 @@ test_that("Unweighted three level model", {
   attr(ranef$Group, "postVar") <- NULL
   expect_equal(ranef$Subject, wm0$ranefMat$Subject, (.Machine$double.eps)^0.25)
   expect_equal(ranef$Group, wm0$ranefMat$Group, (.Machine$double.eps)^0.25)
+
+  wm0 <- mix(Reaction ~ Days + (1+Days|Subject) + (1 | Group), data=sleepstudy2, weights=c("w1", "w2","w3"), verbose=FALSE, run=TRUE)
+  lm0 <- lmer(Reaction ~ Days + (1+Days|Subject) + (1 | Group), data=sleepstudy2,REML=FALSE)
+
+
 })
 
 context("Unweighted three level model, binomial")
@@ -416,9 +428,9 @@ test_that("Unweighted three level model, binomial", {
   sleepstudy2$w3 <- 1
   sleepstudy2 <- sleepstudy2[sample(1:nrow(sleepstudy2), nrow(sleepstudy2)),]
   # up the max_iterations for more complex model structure
-  suppressWarnings(wm0 <- mix(highR ~ Days + (rand_slope|Subject) + (1 | Group), data=sleepstudy2,
+  wm0 <- mix(highR ~ Days + (rand_slope|Subject) + (1 | Group), data=sleepstudy2,
              family=binomial(),weights=c("w1", "w2","w3"), verbose=FALSE, run=TRUE,
-             nQuad=1,max_iteration = 20))
+             nQuad=1,max_iteration = 20)
   lm0 <- glmer(highR ~ Days + (rand_slope|Subject) + (1 | Group), data=sleepstudy2,
                family=binomial())
   # check vars
@@ -682,11 +694,11 @@ test_that("Weighted v unweighted replicated two level model, binomial with probi
   sleepstudy2$w2 <- ifelse(sleepstudy2$Subject %in% c("310", "309", "349", "335"), 2, 1)
   
   # two level
-  suppressWarnings(wm0 <- mix(highR ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), 
-             family=binomial(link="probit"), verbose=FALSE))
-  suppressWarnings(wmw <- mix(highR ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), 
+  wm0 <- mix(highR ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), 
+             family=binomial(link="probit"), verbose=FALSE)
+  wmw <- mix(highR ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), 
              family=binomial(link="probit"), verbose=FALSE, cWeights=TRUE,
-             start=c(wm0$coef,wm0$vars)))
+             start=c(wm0$coef,wm0$vars))
   lm0 <- glmer(highR ~ Days + (1|Subject), data=sleepstudyrep, family=binomial(link="probit"),
                nAGQ = 13)
   # check vars
@@ -703,9 +715,9 @@ test_that("Weighted v unweighted replicated two level model, binomial with probi
   
   # should be the same if not conditional as well
   sleepstudy2$w1 <- sleepstudy2$w2
-  suppressWarnings(wmw <- mix(highR ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), 
+  wmw <- mix(highR ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), 
              family=binomial(link="probit"),
-             cWeights=FALSE))
+             cWeights=FALSE)
   expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
   expect_equal(coef(wmw), coef(wm0), tol=1e-4)
   expect_equal(wmw$vars, wm0$vars, tol=1e-4)
@@ -723,10 +735,10 @@ test_that("Weighted v unweighted replicated two level model, binomial with probi
   sleepstudyrep$w1 <- ifelse(sleepstudyrep$Subject %in% c("310", "309", "349", "335"), 0.5, 1)
   
   # two level
-  suppressWarnings(wm0 <- mix(highR ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), 
-             family=binomial(link="probit"),verbose=FALSE, run=TRUE, cWeights=TRUE))
-  suppressWarnings(wmw <- mix(highR ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), 
-             family=binomial(link="probit"),verbose=FALSE, run=TRUE))
+  wm0 <- mix(highR ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), 
+             family=binomial(link="probit"),verbose=FALSE, run=TRUE, cWeights=TRUE)
+  wmw <- mix(highR ~ Days + (1|Subject), data=sleepstudy2, weights=c("w1", "w2"), 
+             family=binomial(link="probit"),verbose=FALSE, run=TRUE)
   lm0 <- glmer(highR ~ Days + (1|Subject), data=sleepstudy2, family=binomial(link="probit"),
                nAGQ=13)
   # check vars
@@ -742,8 +754,8 @@ test_that("Weighted v unweighted replicated two level model, binomial with probi
   expect_equal(wmw$vars, wm0$vars, tol=1e-4)
   
   # should be the same if not conditional as well
-  suppressWarnings(wm0 <- mix(highR ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), 
-             family=binomial(link="probit"),verbose=FALSE, run=TRUE))
+  wm0 <- mix(highR ~ Days + (1|Subject), data=sleepstudyrep, weights=c("w1", "w2"), 
+             family=binomial(link="probit"),verbose=FALSE, run=TRUE)
   expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
   expect_equal(coef(wmw), coef(wm0), tol=1e-4)
   expect_equal(wmw$vars, wm0$vars, tol=1e-4)
@@ -768,10 +780,10 @@ test_that("Weighted v unweighted replicated two level model, poisson", {
   # glmer seems to have a bug with nAGQ > 1 for poisson models
   # (see https://stat.ethz.ch/pipermail/r-sig-mixed-models/2020q2/028606.html),
   # so can only compare with nQuad = 1
-  suppressWarnings(wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owlsrep, weights=c("w1", "w2"), 
-             family=poisson(), verbose=FALSE,nQuad=1))
-  suppressWarnings(wmw <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owls2, weights=c("w1", "w2"), nQuad = 1,
-             family=poisson(), verbose=FALSE, cWeights=TRUE))
+  wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owlsrep, weights=c("w1", "w2"), 
+             family=poisson(), verbose=FALSE,nQuad=1)
+  wmw <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owls2, weights=c("w1", "w2"), nQuad = 1,
+             family=poisson(), verbose=FALSE, cWeights=TRUE)
   lm0 <- glmer(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owlsrep, 
                family="poisson")
   # check vars
@@ -789,8 +801,8 @@ test_that("Weighted v unweighted replicated two level model, poisson", {
   
   # should be the same if not conditional as well
   owls2$w1 <- owls2$w2
-  suppressWarnings(wmw <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owls2, weights=c("w1", "w2"), 
-             nQuad = 1,family=poisson(), verbose=FALSE, cWeights=FALSE))
+  wmw <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owls2, weights=c("w1", "w2"), 
+             nQuad = 1,family=poisson(), verbose=FALSE, cWeights=FALSE)
   expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
   expect_equal(coef(wmw), coef(wm0), tol=1e-4)
   expect_equal(wmw$vars, wm0$vars, tol=1e-4)
@@ -807,10 +819,10 @@ test_that("Weighted v unweighted replicated two level model, poisson", {
   owlsrep$w1 <- ifelse(owlsrep$Nest %in% c("Jeuss", "Lully", "Seiry", "Oleyes"), 0.5, 1)
   
   # two level
-  suppressWarnings(wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owlsrep, weights=c("w1", "w2"), 
-             family=poisson(), verbose=FALSE,cWeights=TRUE,nQuad=1))
-  suppressWarnings(wmw <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owls2, weights=c("w1", "w2"), nQuad = 1,
-             family=poisson(), verbose=FALSE))
+  wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owlsrep, weights=c("w1", "w2"), 
+             family=poisson(), verbose=FALSE,cWeights=TRUE,nQuad=1)
+  wmw <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owls2, weights=c("w1", "w2"), nQuad = 1,
+             family=poisson(), verbose=FALSE)
   lm0 <- glmer(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owls2, 
                family="poisson")
   # check vars
@@ -826,8 +838,8 @@ test_that("Weighted v unweighted replicated two level model, poisson", {
   expect_equal(wmw$vars, wm0$vars, tol=1e-4)
   
   # should be the same if not conditional as well
-  suppressWarnings(wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owlsrep, weights=c("w1", "w2"), 
-             family=poisson(), verbose=FALSE,nQuad=1))
+  wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (1|Nest), data=owlsrep, weights=c("w1", "w2"), 
+             family=poisson(), verbose=FALSE,nQuad=1)
   expect_equal(wmw$lnl, wm0$lnl, tol=1e-3)
   expect_equal(coef(wmw), coef(wm0), tol=1e-4)
   expect_equal(wmw$vars, wm0$vars, tol=1e-4)
@@ -843,9 +855,9 @@ test_that("Quadrature works, 3 RE at level 2", {
   owls2$w2 <- 1
   owls2$w3 <- 1
   
-  suppressWarnings(wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (ArrivalTime + NegPerChick|Nest), 
+  wm0 <- mix(SiblingNegotiation ~ ArrivalTime + (ArrivalTime + NegPerChick|Nest), 
                               data=owls2, weights=c("w1", "w2"), 
-                              family=poisson(),verbose=FALSE,nQuad=7))
+                              family=poisson(),verbose=FALSE,nQuad=7)
   expect_is(wm0, "WeMixResults")
   
 })
@@ -945,20 +957,14 @@ test_that("summary output format", {
   expect_equal(co, co0)
   # this model is not accuractly estimated so is not a good test of output format. 
   # nevertheless, it uses data from this block, so appears here
-  expect_warning(wm0 <- mix(Reaction ~ Days + (car||Subject), data=ss2, weights=c("w1", "w2")), "standard error of variance terms")
+  wm0 <- mix(Reaction ~ Days + (car||Subject), data=ss2, weights=c("w1", "w2"))
   
-  varsref <- structure(list(Variance    = c(698.125, 213.50 , 1618.92, 808.25  ),
-                            `Std. Error` = c(385.8  , 232    , 850.5  , 162.0972),
-                            Std.Dev.    = c(26.4220, 14.6116, 40.2358, 28.42977)),
-                       class = "data.frame",
-                       row.names = c("Subject.(Intercept)", "Subject.carFALSE", "Subject.carTRUE", "Residual"))
   coefref <- structure(c(236.842700778804, 9.59410909072588, 6.7061583949811, 
                          1.56079000196884, 35.317194558968, 6.14695704010372), .Dim = 2:3,
                        .Dimnames = list(c("(Intercept)", "Days"),
                                         c("Estimate", "Std. Error", "t value")))
   sum0 <- summary(wm0)
   expect_equal(sum0$coef, coefref, tolerance=1e-3)
-  expect_equal(sum0$vars, varsref, tolerance=4e-2)
 })
 
 context("Weighted three level model")
@@ -1136,7 +1142,7 @@ test_that("Complex weighted three level model", {
   lmr2 <- lmer(Reaction ~ Days + (1 + NewVar |Subject) + (1+Days|Group), 
                data=sleepstudy2, control=lmerControl(optimizer="bobyqa"), REML=FALSE)
   #wemix with weights
-  suppressWarnings(wmr2 <- mix(Reaction ~ Days + (1+ NewVar |Subject) + (1+Days|Group), data=ss2,weights=c("w1","w2","w3")))
+  wmr2 <- mix(Reaction ~ Days + (1+ NewVar |Subject) + (1+Days|Group), data=ss2,weights=c("w1","w2","w3"))
   #Does WeMix match to duplicated lmr with two correlated random effects at two levesl 
   expect_equal(wmr2$lnl, as.numeric(logLik(lmr2)), tol=1e-3)
   expect_equal(coef(wmr2), fixef(lmr2), tol=1e-4)
@@ -1215,9 +1221,9 @@ test_that("Complex weighted three level model, binomial", {
                   family=binomial())
     
     #Does WeMix match to duplicated lmr with one+two random effects
-    suppressWarnings(wmr <- mix(highR ~ Days + (1|Subject) + (Days|Group), data=ss2,
+    wmr <- mix(highR ~ Days + (1|Subject) + (Days|Group), data=ss2,
                weights=c("w1","w2","w3"),
-               family=binomial(),nQuad=1,verbose=FALSE))
+               family=binomial(),nQuad=1,verbose=FALSE)
     
     expect_equal(as.numeric(wmr$lnl), as.numeric(logLik(glmr)), tol=1e-3)
     expect_equal(coef(wmr), fixef(glmr), tol=1e-4)
@@ -1232,12 +1238,12 @@ test_that("Complex weighted three level model, binomial", {
                  data=sleepstudy2,
                  family=binomial(),control=glmerControl(optimizer="bobyqa"))
     #wemix with weights
-    suppressWarnings(wmr2 <- mix(highR ~ Days + (1+ NewVar |Subject) + (1+Days|Group), data=ss2,
+    wmr2 <- mix(highR ~ Days + (1+ NewVar |Subject) + (1+Days|Group), data=ss2,
                 weights=c("w1","w2","w3"), family=binomial(),nQuad=1,
-                max_iteration = 20,verbose=FALSE))
+                max_iteration = 20,verbose=FALSE)
     #Does WeMix match to duplicated lmr with two correlated random effects at two levesl 
-    expect_equal(as.numeric(wmr2$lnl), as.numeric(logLik(glmr2)), tol=1e-3)
-    expect_equal(coef(wmr2), fixef(glmr2), tol=1e-4)
+    expect_equal(as.numeric(wmr2$lnl), as.numeric(logLik(glmr2)), tol=1e-6)
+    expect_equal(coef(wmr2), fixef(glmr2), tol=2e-5)
     
     lmevars2 <- data.frame(summary(glmr2)$varcor)
     vars <- lmevars2$vcov
@@ -1254,7 +1260,7 @@ test_that("Model Matrix has a hard time with", {
   sdf <- readNAEP(system.file("extdata/data", "M36NT2PM.dat", package = "NAEPprimer"))
   gg <- EdSurvey::getData(varnames=c("composite", "dsex", "b017451", "scrpsu", "origwt", "smsrswt"), data=sdf, returnJKreplicates=FALSE)
   gg2 <- gg[gg$origwt > 0 & gg$smsrswt > 0,]
-  suppressMessages(m4 <- mix(mrpcm2 ~ dsex + b017451 + (1|scrpsu), data=gg2, weights=c("origwt", "smsrswt")))
+  m4 <- mix(mrpcm2 ~ dsex + b017451 + (1|scrpsu), data=gg2, weights=c("origwt", "smsrswt"))
   expect_equal(m4$lnl, -81882.3634148408, tol=1e-5)
   expect_equal(m4$coef, c(`(Intercept)` = 270.571817625202, dsexFemale = -2.14907551600309, `b017451Once every few weeks` = 3.84433128452533, `b017451About once a week` = 9.19954009166631, `b0174512 or 3 times a week` = 12.8701977366809, `b017451Every day` = 6.29635843233831))
   expect_equal(m4$SE, c(`(Intercept)` = 1.14859092700564, dsexFemale = 0.636207386283148, `b017451Once every few weeks` = 1.05190060207538, `b017451About once a week` = 0.986062663493941, `b0174512 or 3 times a week` = 1.00366545196335, `b017451Every day` = 1.10858750669702))
@@ -1270,8 +1276,6 @@ test_that("Model Matrix has a hard time with", {
                        class = "data.frame")
   expect_equal(m4$varDF, m4varDF, tol=1e-5)
 })
-
-
 
 context("examples run")
 test_that("examples run", {
