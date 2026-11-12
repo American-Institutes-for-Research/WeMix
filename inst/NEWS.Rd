@@ -2,10 +2,21 @@
 \title{NEWS for WeMix}
 
 \section{Changes in version 4.0.4}{
+  \subsection{UPDATES}{
+    \itemize{
+      \item decreased the frequency with which the warning "Numerical instability in estimating the standard error of variance terms. Consider the variance term standard errors approximate." It occurred when the covariance is nearly but not actually positive definite. But it was set too aggressively.
+      \item added support for `terms()`, `model.matrix()`, `model.frame()`, `tidy()` for linear models. see https://github.com/American-Institutes-for-Research/WeMix/issues/26.
+    }
+  }
+
   \subsection{BUG FIXES}{
     \itemize{
-      \item fixed bug in summary when there are two random effects at the lowest grouping level. thanks to Francis Huang for identifying this issue.
+      \item there was a bug in how level-3 weights were handled in the non-linear models, where the wrong index was used for selecting the list of weights. This would have resulted in incorrect weights having been used in some imbalanced non-linear cases.
+      \item updated data pre-processing related to missing values to avoid dropping rows that should not have been dropped. Thanks to David Bamat, Alvaro Cruz, and Rebecca Shipan for identifying this issue.
+      \item the summary output for non-linear models now shows the correlation in the variance terms block.
+      \item fixed bug in summary when there are two random effects at the lowest grouping level. Thanks to Francis Huang for identifying this issue.
       \item fixed handling of non-integer weights which could result in a fit not proceeding in some cases.
+      \item fixed examples not being imported in roxygen because of slash direction.
     }
   }
 }
