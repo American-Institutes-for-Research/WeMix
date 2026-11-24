@@ -50,7 +50,7 @@
 #' traditionally used. We recommend starting at 13 and increasing or decreasing as needed. 
 #' }
 #' @importFrom lme4 getME lmer glmer lFormula GHrule
-#' @importFrom stats dnorm aggregate terms dpois dgamma dbinom ave model.matrix terms.formula as.formula sigma complete.cases update formula gaussian getCall residuals
+#' @importFrom stats dnorm aggregate terms dpois dgamma dbinom ave model.matrix terms.formula as.formula sigma complete.cases update formula gaussian getCall residuals setNames
 #' @importFrom numDeriv genD hessian grad
 #' @importFrom minqa bobyqa 
 #' @importFrom Matrix nearPD sparse.model.matrix Cholesky Matrix .updateCHMfactor tril
@@ -79,7 +79,7 @@
 #' \item{var_theta}{the variance covariance matrix of the theta terms.}
 #' \item{wgtStats}{statistics regarding weights, by level.}
 #' \item{ranefMat}{list of matrixes; each list element is a matrix of random effects by level with IDs in the rows and random effects in the columns.}
-#' @example \man\examples\mix.R
+#' @example /man/examples/mix.R
 #' @author Paul Bailey, Blue Webb, Claire Kelley, and Trang Nguyen 
 #' @export
 mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
@@ -104,10 +104,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(length(class(data)) > 1) { 
     data <- as.data.frame(data)
   }
-  data_srt0 <- genUniqueVar(data, "srt")
-  row_name0 <- genUniqueVar(data, "row_name")
-  data[,data_srt0] <- 1:nrow(data)
-  data[,row_name0] <- rownames(data)
   if(!missing(acc0)) message("The argument acc0 is now deprecated and will be ignored.")
   if(nQuad <= 0) stop(paste0("The argument ", sQuote("nQuad"), " must be a positive integer."))
   if(!inherits(run, "logical")) stop(paste0("The argument ", sQuote("run"), " must be a logical."))
@@ -116,20 +112,26 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(any(!weights %in% colnames(data))) stop(paste0("The argument ", sQuote("weights"), " must specify valid columns in ", sQuote("data"), ". Could not find column(s): ", paste(dQuote(weights[!weights %in% colnames(data)]), collapse=", "), "."))
   if(!missing(fast)) warning(paste0("The ", sQuote("fast"), " argument is deprecated."))
   if(any(grepl("[|].*[.]",attributes(terms(formula))$term.labels))) stop("The formula is not valid for mix. The name of conditioning variables must not contain a dot. Try renaming variables after | in the fomrula so they do not contain a dot.")
+  # subset to just the needed columns
+  data <- data[,c(all.vars(formula), weights)]
+  data_srt0 <- genUniqueVar(data, "srt")
+  row_name0 <- genUniqueVar(data, "row_name")
+  data[,data_srt0] <- 1:nrow(data)
+  data[,row_name0] <- rownames(data)
   #currently wemix can only use complete cases
   #this removes any  incomplete cases if they exist 
-  if(any(is.na(data[ , c(all.vars(formula), weights)]))) {
-    cl <- call("model.frame",
-               formula=formula(paste0("~", paste0(unique(c(all.vars(formula), weights, data_srt0, row_name0)),collapse=" + "))),
-               data=data)
-    dt <- eval(cl, parent.frame(1L))
-    warning(paste0("There were ", sum(nrow(data) - nrow(dt)), " rows with missing data. These have been removed."))
-    data <- dt 
-    rm(dt)
+  cl <- call("model.frame",
+             formula=formula(paste0("~", paste0(unique(c(all.vars(formula), weights, data_srt0, row_name0)),collapse=" + "))),
+             data=data)
+  n0 <- nrow(data)
+  any_miss <- any(is.na(data[ , c(all.vars(formula), weights)]))
+  data <- eval(cl, parent.frame(1L))
+  if(any_miss) {
+    warning(paste0("There were ", sum(n0 - nrow(data)), " rows with missing data. These have been removed."))
   }
+
   weights0 <- weights # keep track of incomming weights column names
   data <- dropNonPositiveWeights(data, weights)
-
   family <- setup_family(family)
 
   # set up initial values 
@@ -157,12 +159,21 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
 
   # remove row names so that resorted order is used in lme model 
   row.names(data) <- NULL
-  
+  formula_str <- paste(deparse(lformula$formula), collapse=" ")
+  # this finds on of these two things: "([zero or more white spaces]0[zero or more white spaces]+" or "||" both of which indicate 
+  zero_corr <- grepl("[(][\\W]*0[\\W]*[+]|\\|\\|", formula_str, perl=TRUE)
+  # first condition is: if there is a group that appears twise, that would indicate an uncorrelated RE
+  # second is if there is a 0 or a ||, which also indicates uncorrleated REs
+  if( (length(unparsedGroupNames) != length(unique(unparsedGroupNames)) || 
+       zero_corr) & !is.null(family)){
+    stop("Fitting non-linear models with uncorrelated random effects is not currently supported.")
+  }
   # run lmer to get a ballpark fit and model structure information
   lme <- fit_unweighted_model(formula, data, family, verbose)
 
   # get y, test for validity
   mf <- model.frame(lme)
+  attr(data, "terms") <- attr(mf, "terms")
   responseCol <- attributes(attributes(mf)$terms)$response
   y <- as.numeric(mf[ , responseCol])
   if(!is.null(family) && family$family == "binomial") {
@@ -269,7 +280,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # must happen after sorting so it is sorted correctly
   wgts0 <- getWgts0(data, weights, cWeights)
   wgtsC <- getWgtsC(data, weights, cWeights)
-  
   nRE <- list()
   for(i in 1:(levels-1)){
     nRE[[i]] <- ncol(Z[[i+1]])
@@ -370,14 +380,13 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(any(varCorrect)) {
     lmeVarDF$vcov[varCorrect] <- pmax(log(lmeVarDF$vcov[varCorrect]) + 1, -3.59)
   }
-  # add names to the variance terms of the paramter vector
-  names(est0)[-(1:k)] <- lmeVarDF$grp
-  
+
   #add full variable name to lmeVarDF for later use 
   lmeVarDF$fullGroup <- paste0(lmeVarDF$grp,ifelse(!is.na(lmeVarDF$var2), paste0(".", lmeVarDF$var2), ""),
                                ifelse(!is.na(lmeVarDF$var1), paste0(".", lmeVarDF$var1), ""))
   lmeVarDF$theta <- getME(lme,"theta")[lmeVarDF$fullGroup]
-
+  # add names to the variance terms of the paramter vector
+  names(est0)[-(1:k)] <- lmeVarDF$fullGroup
   # use helper funtion to create a covariance matrix from the data frame with variance and covariance information
   covarianceConstructor <- covMat2Cov(lmeVarDF)
 
@@ -513,7 +522,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
       ihes <- -1*getHessian(b2(f=bsq, optpar=opt$par, b=bhatq$b, sigma0=bhatq$sigma, inds=inds),
                                            x=c(opt$par[inds], sigma=bhatq$sigma))
       eihes <- eigen(ihes)
-      if(min(eihes$values) <= 0 || max(eihes$values)/min(eihes$values) >= 1/((.Machine$double.eps)^0.25)) {
+      if(min(eihes$values) <= 0 || max(eihes$values)/min(eihes$values) >= 1/((.Machine$double.eps)^0.5)) {
         warning("Numerical instability in estimating the standard error of variance terms. Consider the variance term standard errors approximate.")
         ihes <- nearPD(ihes,  posd.tol=400*sqrt(.Machine$double.eps))$mat
       }
@@ -625,8 +634,14 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     assign("cConstructor", value=cc, envir=env)
 
     mu <- eta <- X%*%bhatq$b + Z%*%unlist(bhatq$ranef)
+    # for resorting resid, mu, eta, y
+    resort <-  sort(data[,data_srt0], index.return=TRUE)$ix
+    rownames(data) <- data[,row_name0]
     # now build the results
+    mf <- data[resort,!colnames(data) %in% c(data_srt0, row_name0)]
+    attr(mf, "terms") <- attr(data, "terms")
     res <-list(lnlf=bsq, lnl= bhatq$lnl, coef = bhatq$b, ranefs=bhatq$ranef,
+               mf = mf,
                SE = bhatq$seBetaRobust, 
                vars= vars,
                theta=bhatq$theta, call=call,
@@ -635,8 +650,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
                is_adaptive=FALSE, sigma=bhatq$sigma, cov_mat=bhatq$varBetaRobust,
                ngroups=ngroups, varDF=varDF, varVC=varVC,var_theta=var_of_var,
                wgtStats=ngrpW, ranefMat = uMatList)
-    # for resorting resid, mu, eta, y
-    resort <-  sort(data[,data_srt0], index.return=TRUE)$ix
     if("resid" %in% names(bhatq)) {
       resid <- bhatq$resid[resort]
       names(resid) <- data[,row_name0]
@@ -661,13 +674,13 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   if(verbose) {
     cat("Identifying initial integration locations estimates for random effects.\n")
   }
-  
+
   n_l2 <- unique(lmeVarDF$ngrp[lmeVarDF$level == 2])
   n_top <- unique(lmeVarDF$ngrp[lmeVarDF$level == max(lmeVarDF$level)])
-
+ 
   l2_group_sizes <- as.vector(table(data[[unique(lmeVarDF$grp[lmeVarDF$level==2])]]))
   group_sizes <- as.vector(table(aggregate(.~data[[groupNames[1]]],data,unique)[[unique(lmeVarDF$grp[lmeVarDF$level==max(lmeVarDF$level)])]]))
-
+  
   q2 <- nrow(lmeVarDF[lmeVarDF$level == 2 & is.na(lmeVarDF$var2),])
   q3 <- nrow(lmeVarDF[lmeVarDF$level == 3 & is.na(lmeVarDF$var2),])
   q_tot <- q3*n_top + q2*n_l2
@@ -686,24 +699,25 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #     3) Maximum Likelihood estimation      #
   #############################################
   # this gets used in optimization
+  est <- est0
+  est_names <- names(est0)
   main_lnl <- main_lnl_container(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
                                  l2_group_sizes,group_sizes,levels,weights,
-                                 weights_cond,nQuad,family)
+                                 weights_cond,nQuad,family, est_names)
   
   # this gets returned to the user/used in summary methods
   main_lnlR <- lnl_by_group(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
                             l2_group_sizes,group_sizes,levels,weights,
-                            weights_cond,nQuad,family,parameterization = "var")
+                            weights_cond,nQuad,family, parameterization = "var")
   tol <- 1e-5
   not_converged <- TRUE
   iteration <- 0
-  est <- est0
   # sometimes lme4 model doesn't converge when fit on the unweighted,
   # which can lead to near 0 estimates of some thetas. to combat this
   # we set a floor at +/-0.001
   sign <- sign(lmeVarDF$theta) + ifelse(sign(lmeVarDF$theta) == 0,1,0)
   est <- c(est[1:ncol(X)],sign*pmax(abs(lmeVarDF$theta),0.001))
-
+  names(est) <- est_names
   while(iteration < max_iteration & not_converged){
     step_size <- 1
     
@@ -720,7 +734,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     
     going <- TRUE
     while(going & main_lnl(est) >
-          main_lnl(est + step_size*inc)){
+          main_lnl(setNames(est + step_size * inc, names(est)))){
       step_size <- step_size * 0.5
       if(abs(step_size) < 0.001){
         if(step_size < 0) {
@@ -732,7 +746,7 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     }
     
     est <- est + step_size*inc
-    
+    names(est) <- est_names
     gradhess_new <- getGradHess(func=main_lnl, x=est)
     g <- gradhess_new$grad
     
@@ -741,7 +755,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     }
     iteration <- iteration + 1
   }
-
   lambda <- updateLambda(lambda,est[-(1:ncol(X))],q2,q3,n_l2,n_top)
   Sigma <- lambda%*%Matrix::t(lambda)
   
@@ -755,6 +768,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   #            4) Post Estimation             #
   #############################################
   
+  re_params <- est[-(1:ncol(X))]
+  num_l2_cov <- length(re_params[startsWith(names(re_params),groupNames[1])]) - q2
   # need to add this
   final_modes <- pirls_u(y,X,Z_mat,lambda,u=rep(0,length(PsiVec)),beta=est[1:ncol(X)],Whalf,mu_eta,
                  family,w1=weights[[1]]$w,PsiVec,Psi,l2_group_sizes,group_sizes,n_l2,n_top,
@@ -765,47 +780,43 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   # we'll make a parameter vector with vcov estimates
   est_tmp <- vector()
   l2_var <- unique(diag(Sigma))[1:q2]
+  names(l2_var) <- est_names[startsWith(est_names, groupNames[1]) & grepl("^[^.]*\\.[^.]*$", est_names)]
   est_tmp <- c(est_tmp,l2_var)
+  l2_l3_cov_est <- unique(tril(Sigma,-1)@x)
   if(q2 > 1){
-    l2_cov <- unique(tril(Sigma,-1)@x)
-    l2_cov <- l2_cov[1:choose(q2,2)]
-    est_tmp <- c(est_tmp,l2_cov)
+    l2_cov <- l2_l3_cov_est[1:num_l2_cov]
+    if(any(!is.na(l2_cov))) {
+      names(l2_cov) <- est_names[startsWith(est_names, groupNames[1]) & grepl(".*\\..*\\..*", est_names)]
+      est_tmp <- c(est_tmp,l2_cov)
+    }
   }
   if(levels == 3){
     l3_var <- unique(diag(Sigma))[(q2+1):(q2+q3)]
+    names(l3_var) <- est_names[startsWith(est_names, groupNames[2]) & grepl("^[^.]*\\.[^.]*$", est_names)]
     est_tmp <- c(est_tmp,l3_var)
     if(q3 > 1){
-      l3_cov <- unique(tril(Sigma,-1)@x)
-      l3_cov <- l3_cov[(choose(q2,2)+1):(choose(q2,2)+choose(q3,2))]
-      est_tmp <- c(est_tmp,l3_cov)
+      l3_cov <- l2_l3_cov_est[(num_l2_cov+1):length(l2_l3_cov_est)]
+      if(any(!is.na(l3_cov))) {
+        names(l3_cov) <- est_names[startsWith(est_names, groupNames[2]) & grepl(".*\\..*\\..*", est_names)]
+        est_tmp <- c(est_tmp,l3_cov) 
+      }
     }
   }
-  est[-(1:k)] <- est_tmp
+  common_names <- intersect(names(est), names(est_tmp))
+  est[common_names] <- est_tmp[common_names]
+  #est[-(1:k)] <- est_tmp
   # make sure the names agree with lmer
-  names(est) <- names(parlme)
-  
+  names(est) <- est_names
+  names(est.chol) <- est_names
   lnl_final <- main_lnl(est.chol)
   
   main_lnl <- main_lnl_container(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
                                  l2_group_sizes,group_sizes,levels,weights,
-                                 weights_cond,nQuad,family,parameterization = "var")
+                                 weights_cond,nQuad,family, est_names, parameterization = "var")
   hessian <- getGradHess(main_lnl,est)$hess
-  # fix vars that are less than one to be mapped
-  covs_and_vars <- est[-(1:k)]
-  vars <- covs_and_vars[which(is.na(lmeVarDF$var2))] #select only vars not covars 
-  need_fix_vars <- which(vars < 1)
-  #covs_and_vars[need_fix_vars] <- exp(covs_and_vars[need_fix_vars] - 1)
-  
   # get vars and name them
-  vars <- covs_and_vars
-  names(vars) <- gsub(":NA", "", paste(lmeVarDF$grp, lmeVarDF$var1, lmeVarDF$var2, sep=":"))
-
-  # If any of variances got re mapped, re calculate hessian just inside the line, and 
-  # share the limitation on WeMix estimation and the model wit the user.
-  if (length(need_fix_vars) > 0){
-    # calculate hessian, moving covariances to just larger values so the Hessian is internal
-    hessian <- getGradHess(main_lnl, c(est[1:k], covs_and_vars+0.0002*need_fix_vars))$hess
-  }
+  vars <- est[-(1:k)]
+  #names(vars) <- gsub(":NA", "", paste(lmeVarDF$grp, lmeVarDF$var1, lmeVarDF$var2, sep=":"))
 
   #calculate interclass corelation (ICC) 
   var_between <- sum(vars[which(!is.na(lmeVarDF$var1) & is.na(lmeVarDF$var2))])
@@ -819,15 +830,8 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   varDF <- lmeVarDF[,c("grp", "var1", "var2", "vcov", "ngrp", "level", "fullGroup")]
 
   varDF$vcov <- 0
-  #varDF$fullGroup <- paste0(varDF$grp,ifelse(!is.na(varDF$var1),paste0(".",varDF$var1),""))
   
   varDF$vcov <- vars #re assign in variance from mix.
-  res <- list(lnlf=main_lnlR, lnl=lnl_final, coef=est[1:k], 
-              vars=vars,
-              call=call, levels=levels, ICC=ICC, CMODE=u_vector,
-              invHessian=hessian, is_adaptive=TRUE,
-              ngroups=ngroups, varDF=varDF,
-              wgtStats=ngrpW)
   theta <- getME(lme,"theta")
   temp_Z <- getME(lme, "Ztlist")
   #find out which level each applies to 
@@ -836,7 +840,6 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
   for (i in 2:levels){
     z_names <- z_levels[z_levels$level==i,"fullGroup"]
     Zlist[[i-1]] <- Matrix::t(do.call(rbind, temp_Z[z_names]))
-    #Zlist[[i-1]] <- t(as.matrix((Reduce(rbind, temp_Z[z_names]))))
   }
   bhatq <- list()
   bhatq[["ranef"]] <- list()
@@ -864,23 +867,57 @@ mix <- function(formula, data, weights, cWeights=FALSE, center_group=NULL,
     ranef_list[[l]] <- vals
     rownames(ranef_list[[l]]) <- names
   }
-  sandwich_est <- makeSandwich(list(coef=est[1:k],vars=vars,
-                                    invHessian=hessian,lnlf=main_lnlR))
+  obj_list <- list(coef=est[1:k],vars=vars,
+                   invHessian=hessian,lnlf=main_lnlR)
+  #names(obj_list$vars) <- lmeVarDF$grp
+  sandwich_est <- makeSandwich(obj_list)
+  # standard errors of fixed effect estimates
   SE <- sandwich_est$se[1:k]
+  # variance/covariance of fixed effect estimates
   cov_mat <- sandwich_est$VC[1:k,1:k]
+  # standard errors of RE variance estimates
   var_theta <- sandwich_est$se[-(1:k)]
-  res <- list(lnlf=main_lnlR, lnl=lnl_final, coef=est[1:k], ranefs=ranef_list,
+  varDF$SEvcov <- var_theta
+  # build out varVC
+  lmeVarDF$vcov <- vars
+  varVC <- list(s=NULL)
+  for(l in 2:levels) {
+    levelDF <- lmeVarDF[lmeVarDF$level==l,]
+    ki <- length(unique(levelDF$var1))
+    vc <- matrix(0, nrow=ki, ncol=ki)
+    colnames(vc) <- rownames(vc) <- unique(levelDF$var1)
+    for(i in 1:nrow(levelDF)) {
+      if(is.na(levelDF$var2[i])) {
+        vc[rownames(vc)==levelDF$var1[i],colnames(vc)==levelDF$var1[i]] <- levelDF$vcov[i]
+      } else {
+        vc[rownames(vc)==levelDF$var1[i],colnames(vc)==levelDF$var2[i]] <- levelDF$vcov[i]
+        vc[rownames(vc)==levelDF$var2[i],colnames(vc)==levelDF$var1[i]] <- levelDF$vcov[i]
+      }
+    }
+    varVC <- c(varVC, list(vc))
+  }
+  names(varVC) <- c('', groupNames)
+  # note used later for resorting resid, mu, eta, y
+  resort <-  sort(data[,data_srt0], index.return=TRUE)$ix
+  rownames(data) <- data[,row_name0]
+  # now build the results
+  resp <- attr(terms(data), "response")
+  respn <- colnames(mf)[resp]
+  mf <- cbind(mf[ , resp],
+              data[resort,!colnames(data) %in% c(data_srt0, row_name0)][,-resp])
+  colnames(mf)[1] <- respn
+  attr(mf, "terms") <- attr(data, "terms")
+  res <- list(lnlf=main_lnl, lnl=lnl_final, coef=est[1:k], ranefs=ranef_list,
               SE=SE, vars=vars, theta=est.chol[-(1:k)], X=X, y=y, Z=Z_mat,
               call=call, levels=levels, ICC=ICC, CMODE = final_modes$modes,
               invHessian=hessian, is_adaptive=TRUE, sigma = 1,
-              ngroups=ngroups, varDF=varDF, varVC=varDF$vcov, 
+              ngroups=ngroups, varDF=varDF, varVC=varVC, 
               cov_mat=cov_mat, var_theta=var_theta,
-              wgtStats=ngrpW, ranefMat=umat)
+              wgtStats=ngrpW, ranefMat=umat,
+              mf=mf)
   class(res) <- "WeMixResults"
   mu <- final_modes$mu
   eta <- final_modes$eta
-  # for resorting resid, mu, eta, y
-  resort <-  sort(data[,data_srt0], index.return=TRUE)$ix
   mu <- mu[resort]
   eta <- eta[resort]
   y <- y[resort]
@@ -913,10 +950,6 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
   }
 
   olducden <- updatemu(u*0)
-  # this is used here to find the determinant of a Cholesky matrix /sqrt(psi) ^ psi
-  det_chol_psi <- function(gL,psi) {
-    log(prod((diag(gL)/sqrt(psi))^psi))
-  }
   
   while(pirls & iter <= 500){
     mu_eta@x <- family$mu.eta(eta)
@@ -944,7 +977,6 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
     if(is.na(ucden) | !is.finite(ucden)){
       ucden <- updatemu(u - delu)
     }
-
     while(step_size > 0.001 && ucden > olducden){
       step_size <- step_size/2
       ucden <- updatemu(u + step_size*delu)
@@ -965,7 +997,6 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
   wtres <- diag(Whalf)*(y - mu)
   LtZtMWhalf <- as(LtZt%*%(mu_eta*diag(Whalf)),"sparseMatrix")
   # update Cholesky decomposition
-  #L <- Cholesky(Matrix::tcrossprod(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
   L <- Cholesky(LtZtMWhalf %*% Matrix::t(LtZtMWhalf) + Psi, perm=FALSE, LDL=FALSE, Imult=0)
   L <- as(L,"sparseMatrix")
   
@@ -974,13 +1005,17 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
   
   det_by_group <- NULL
   # new args i need to add: l2_group_sizes,group_sizes,n_l2,n_top,levels
+  # this is used here to find the determinant of a Cholesky matrix /sqrt(psi) ^ psi
+  det_chol_psi <- function(gL,psi) {
+    log(prod((diag(gL)/sqrt(psi))^psi))
+  }
   if(by_group){
     llh <- llh_l2 <- l2_group_L <- l3_group_L <- vector(mode="numeric")
     log_y_u <- rowsum(family$lnl(y,mu,w1,sd=NULL),rep(1:n_l2,l2_group_sizes))
     for(i in 1:n_l2){
       group_Psi <- PsiVec[((i-1)*q2 + 1):(i*q2)]
       group_L <- L[((i-1)*q2 + 1):(i*q2),((i-1)*q2 + 1):(i*q2),drop=FALSE]
-      l2_group_L[i] <- det_chol_psi(group_L, group_Psi)
+      l2_group_L[i] <- det_chol_psi(gL=group_L, psi=group_Psi)
       group_u <- u[((i-1)*q2 + 1):(i*q2)]
       llh_l2[i] = log_y_u[i] - 0.5*sum(group_Psi*group_u^2) 
     }
@@ -996,15 +1031,19 @@ pirls_u <- function(y,X,Z_mat,lambda,u,beta,Whalf,mu_eta,family,w1,PsiVec,Psi,
       l3_L <- L[((n_l2*q2)+1):nrow(L),((n_l2*q2)+1):nrow(L)]
       l2_l3_L <- L[((n_l2*q2)+1):nrow(L),(1:(n_l2*q2))]
       for(n in 1:n_top){
+        start <- ifelse(n==1, 1, sum(q2*group_sizes[1:(n-1)]) + 1)
+        end <- sum(q2*group_sizes[1:n])
         l3_comp <- l3_L[((n-1)*q3 + 1):(n*q3),((n-1)*q3 + 1):(n*q3)]
-        l2_comp <- l2_L[l2_l3_L[((n-1)*q3 + 1),]!=0,l2_l3_L[((n-1)*q3 + 1),]!=0]
+        l2_comp <- l2_L[start:end, start:end]
         l2_l3_comp <- l2_l3_L[((n-1)*q3 + 1):(n*q3),]
         if(any(c(inherits(l2_l3_comp, "matrix"), inherits(l2_l3_comp, "Matrix"))) ) {
-          l2_l3_comp <- matrix(l2_l3_comp[l2_l3_comp!=0], nrow=nrow(l2_l3_comp))
+          l2_l3_comp <- matrix(l2_l3_comp[,start:end], nrow=nrow(l2_l3_comp))
+        } else {
+          l2_l3_comp <- l2_l3_comp[l2_l3_comp!=0]
         }
         col.tmp <- matrix(0,ncol=q3,nrow=group_sizes[n]*q2)
         group_L <- Matrix(cbind(rbind(l2_comp,l2_l3_comp),rbind(col.tmp,l3_comp)))
-        l3_group_Psi <- c(l2_Psi[l2_l3_L[n,]!=0],l3_Psi[((n-1)*q3 + 1):(n*q3)])
+        l3_group_Psi <- c(l2_Psi[l2_l3_L[q3*n,]!=0],l3_Psi[((n-1)*q3 + 1):(n*q3)])
         l3_group_L[n] <- det_chol_psi(group_L, l3_group_Psi)
         l3_group_u <- l3_u[((n-1)*q3 + 1):(n*q3)]
         llh[n] <- llh_tmp[n] - 0.5*sum(l3_Psi[((n-1)*q3 + 1):(n*q3)]*l3_group_u^2) - l3_group_L[n]
@@ -1051,7 +1090,7 @@ makeAdaptedPts <- function(muHat,R,nQuad,levels,q2,q3,n_l2,n_top){
     output <- list(adapt_l2 = new_l2,adapt_l3=new_l3,adapt_comb=combined,
                    l2_weights=l2_weights,l3_weights=l3_weights)
     
-  }else{
+  } else {
     new_l2 <- Matrix::solve(R_l2,l2_points[rep(1:nrow(l2_points),times=n_l2),]) + muHat2
     combined <- new_l2
     output <- list(adapt_l2 = new_l2,l2_weights=l2_weights,adapt_comb=combined)
@@ -1061,19 +1100,25 @@ makeAdaptedPts <- function(muHat,R,nQuad,levels,q2,q3,n_l2,n_top){
 }
 
 constructSigma <- function(vcov,nRE,n_l2,n_top){
-  
   mat_list <- list()
-  
+  level_names <- unique(unlist(lapply(strsplit(names(vcov),'\\.'), FUN =function(x){x[1]})))
   # there will always be at least 2 levels
   q2 <- nRE[[1]]
-  l2_var <- vcov[1:q2]
+  vnames <- names(vcov)
+  l2_var <- vcov[startsWith(vnames, level_names[1]) & grepl("^[^.]*\\.[^.]*$", vnames)]#vcov[1:q2]
   l2_mat <- Diagonal(x=l2_var)
-  l2_cov <- NULL
+  rownames(l2_mat) <- colnames(l2_mat) <- names(l2_var)
   if(q2 > 1){
-    l2_cov <- vcov[(q2+1):(q2+choose(q2,2))]
-    l2_mat[row(l2_mat) < col(l2_mat)] <- l2_mat[row(l2_mat) > col(l2_mat)] <- l2_cov
+    for(row in 1:nrow(l2_mat)) {
+      for(col in 1:ncol(l2_mat)) {
+        cov_name <- paste0(rownames(l2_mat)[row], '.', 
+                           strsplit(colnames(l2_mat)[col],'\\.')[[1]][2])
+        if(cov_name %in% names(vcov)) {
+          l2_mat[row,col] <- l2_mat[col,row] <- vcov[names(vcov) == cov_name]
+        }
+      }
+    }
   }
-
   if(length(nRE) == 1){
     if(q2 == 1){
       group_sigma <- Diagonal(x=rep(l2_var,n_l2))
@@ -1082,52 +1127,71 @@ constructSigma <- function(vcov,nRE,n_l2,n_top){
       group_sigma <- bdiag(mat_list)
     }
   }
-  
   # for three levels, we need to create a block-diagonal matrix
   if(length(nRE) > 1){
-    
-    vcov <- vcov[-(1:(length(l2_var)+length(l2_cov)))]
+    vcov_l3 <- vcov[startsWith(names(vcov),level_names[2])]
     
     q3 <- nRE[[2]]
-    l3_var <- vcov[1:q3]
+    l3_var <- vcov_l3[grepl("^[^.]*\\.[^.]*$", names(vcov_l3))]
     l3_mat <- Diagonal(x=l3_var)
-    
+    rownames(l3_mat) <- colnames(l3_mat) <- names(l3_var)
     if(q3 > 1){
-      l3_cov <- vcov[(q3+1):(q3+choose(q3,2))]
-      l3_mat[row(l3_mat) < col(l3_mat)] <- l3_mat[row(l3_mat) > col(l3_mat)] <- l3_cov
+      for(row in 1:nrow(l3_mat)) {
+        for(col in 1:ncol(l3_mat)) {
+          cov_name <- paste0(rownames(l3_mat)[row], '.', 
+                             strsplit(colnames(l3_mat)[col],'\\.')[[1]][2])
+          if(cov_name %in% names(vcov_l3)) {
+            l3_mat[row,col] <- l3_mat[col,row] <- vcov_l3[names(vcov_l3) == cov_name]
+          } 
+        }
+      }
     }
 
     mat_list <- c(replicate(n_l2,l2_mat,simplify = FALSE),replicate(n_top,l3_mat,simplify = FALSE))
     group_sigma <- bdiag(mat_list)
   }
-  
   return(group_sigma)
   
 }
 
 updateLambda <- function(lambda,vcov,q2,q3,n_l2,n_top){
-  
-  vcov_l2 <- vcov[1:(q2+choose(q2,2))]
-  var_l2 <- vcov_l2[1:q2]
+  level_names <- unique(unlist(lapply(strsplit(names(vcov),'\\.'), FUN =function(x){x[1]})))
+  vcov_l2 <- vcov[startsWith(names(vcov),level_names[1])]
+  var_l2 <- vcov_l2[grepl("^[^.]*\\.[^.]*$", names(vcov_l2))]
   tmp_l2_mat <- diag(var_l2,ncol=q2,nrow=q2)
-  
+  rownames(tmp_l2_mat) <- colnames(tmp_l2_mat) <- names(var_l2)
   if(q2 > 1){
-    cov_l2 <- vcov_l2[-(1:q2)]
-    tmp_l2_mat[lower.tri(tmp_l2_mat)] <- cov_l2
+    for(row in 1:nrow(tmp_l2_mat)) {
+      for(col in 1:ncol(tmp_l2_mat)) {
+        cov_name <- paste0(rownames(tmp_l2_mat)[row], '.', 
+                             strsplit(colnames(tmp_l2_mat)[col],'\\.')[[1]][2])
+        if(cov_name %in% names(vcov)) {
+            tmp_l2_mat[row,col] <- tmp_l2_mat[col,row] <- vcov_l2[names(vcov_l2) == cov_name]
+        }
+      }
+    }
   }
 
   tmp_l2_mat <- as(tmp_l2_mat,"sparseMatrix")
   
   l2_theta <- rep(unique(tmp_l2_mat@x),n_l2)
-  
   if(q3 != 0){
-    vcov_l3 <- vcov[(q2 + choose(q2,2) + 1):length(vcov)]
-    var_l3 <- vcov_l3[1:q3]
+    vcov_l3 <- vcov[startsWith(names(vcov),level_names[2])]
+    var_l3 <- vcov_l3[grepl("^[^.]*\\.[^.]*$", names(vcov_l3))]
     tmp_l3_mat <- diag(var_l3,ncol=q3,nrow=q3)
-    if(q3 > 1){
-      cov_l3 <- vcov_l3[-(1:q3)]
-      tmp_l3_mat[lower.tri(tmp_l3_mat)] <- cov_l3
+    rownames(tmp_l3_mat) <- colnames(tmp_l3_mat) <- names(var_l3)
+    if(q3 > 1) {
+      for(row in 1:nrow(tmp_l3_mat)) {
+        for(col in 1:ncol(tmp_l3_mat)) {
+          cov_name <- paste0(rownames(tmp_l3_mat)[row], '.', 
+                             strsplit(colnames(tmp_l3_mat)[col],'\\.')[[1]][2])
+          if(cov_name %in% names(vcov)) {
+            tmp_l3_mat[row,col] <- tmp_l3_mat[col,row] <- vcov_l3[names(vcov_l3) == cov_name]
+          }
+        }
+      }
     }
+    
     tmp_l3_mat <- as(tmp_l3_mat,"sparseMatrix")
     
     l3_theta <- rep(unique(tmp_l3_mat@x),n_top)
@@ -1135,8 +1199,6 @@ updateLambda <- function(lambda,vcov,q2,q3,n_l2,n_top){
   }else{
     lambda@x <- l2_theta
   }
-  
-  
   lambda
 }
 
@@ -1156,7 +1218,7 @@ pt_inverse <- function(mat,m=1e-5){
 
 main_lnl_container <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
                                l2_group_sizes,group_sizes,levels,weights,weights_cond,
-                               nQuad,family,
+                               nQuad,family, vcov_names,
                                parameterization="cholesky") {
   w1 <- weights[[1]]$w
   w1c <- weights_cond[[1]]$w
@@ -1177,7 +1239,8 @@ main_lnl_container <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
   function(thetabeta){
     beta <- thetabeta[1:ncol(X)]
     vcov <- thetabeta[-(1:ncol(X))]
-    if(parameterization != "cholesky"){
+    names(vcov) <- vcov_names[-(1:ncol(X))]
+    if(parameterization != "cholesky") {
       sigma_mat <- as(nearPD2(Matrix(constructSigma(vcov,nRE,n_l2,n_top))),"sparseMatrix")
       lambda <- as(Cholesky(sigma_mat),"sparseMatrix")
     }else{
@@ -1229,7 +1292,6 @@ main_lnl_container <- function(q2,q3,X,y,Z_mat,lambda,Whalf,mu_eta,n_l2,n_top,
                                     rowLogSumExps(llh_l2_point[,((i-1)*(nQuad^q2) + 1):((nQuad^q2)*i)] + 
                                                     rep(log(l2_weights),each=n_l2)))
         }
-
         norm_llh_l3 <- -0.5*rowsum(as.matrix(new_l3^2),group=rep(1:n_top,each=q3))
         llh_l3_point <- rowsum(w2c*llh_l2_inner_sum,
                                group=rep(1:n_top,times=group_sizes)) + norm_llh_l3
