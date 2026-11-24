@@ -51,6 +51,7 @@ Useful links:
 
 Authors:
 \itemize{
+  \item Paul Bailey \email{pbailey@air.org}
   \item Blue Webb
   \item Claire Kelley
   \item Trang Nguyen

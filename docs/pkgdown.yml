@@ -1,7 +1,7 @@
-pandoc: 3.1.2
-pkgdown: 2.1.1
+pandoc: '3.10'
+pkgdown: 2.2.0
 pkgdown_sha: ~
 articles:
   Introduction_to_Mixed_Effects_Models_With_WeMix: Introduction_to_Mixed_Effects_Models_With_WeMix.html
   Weighted_Linear_Mixed_Effects_Models: Weighted_Linear_Mixed_Effects_Models.html
-last_built: 2024-10-23T21:01Z
+last_built: 2026-11-12T21:03Z
