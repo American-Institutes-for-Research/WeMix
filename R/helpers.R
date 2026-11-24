@@ -17,36 +17,10 @@ print.WeMixResults <- function(x, ...) {
 #' @export
 summary.WeMixResults <- function(object, ...) {
   x0 <- object
-  #for adaptive quad models 
-  if(object$is_adaptive){
-    VC <- makeSandwich(object) # calculates the sandwhich estimator of variance 
-    object$vc <- VC$VC #sets variances returned by model to variances calculated by sandwich estimator
-    se <- VC$se[1:length(x0$coef)]
-    re_se <- VC$se[-(1:length(x0$coef))] #not used currently 
-    if(object$levels == 2){
-      x0$varVC <- list(NULL,VC$VC[names(x0$vars),names(x0$vars)])
-    }else{
-      x0$varVC <- list(NULL,
-                       VC$VC[grep(names(object$ngroups)[2],colnames(VC$VC)),
-                             grep(names(object$ngroups)[2],colnames(VC$VC))],
-                       VC$VC[grep(names(object$ngroups)[3],colnames(VC$VC)),
-                             grep(names(object$ngroups)[3],colnames(VC$VC))])
-    }
-    # build the var mat output, first adding SEvcov
-    varDF <- x0$varDF
-    varDF$SEvcov <- NA
-    names(re_se) <- gsub(":",".",names(re_se),fixed=TRUE) # change : to .
-    for(i in 1:nrow(varDF)) {
-      if(varDF$fullGroup[i] %in% names(re_se)) {
-        varDF$SEvcov[i] <- re_se[varDF$fullGroup[i]] 
-      }
-    }
-  } else{
-    se <- object$SE
-    re_se <- rep(0, length(x0$vars))
-    # build the var mat output from this
-    varDF <- x0$varDF
-  }
+  se <- object$SE
+  re_se <- rep(0, length(x0$vars))
+  # build the var mat output from this
+  varDF <- x0$varDF
   object$coef <- as.matrix(data.frame(Estimate=x0$coef, "Std. Error"=se, "t value"=x0$coef/se))
   # make.names breaks/fixes colnames with spaces, un-break/-fix them.
   colnames(object$coef)[2:3] <- c("Std. Error", "t value")
@@ -66,19 +40,15 @@ summary.WeMixResults <- function(object, ...) {
         for(j in 1:(i-1)){
           # For now just do the names differently based on whether it's a linear model or not;
           # ultimately should try to standardize naming
-          if("family" %in% names(object$call)) {
-            level_namei <- paste0(varsmatlevel$Group[1], ":",
-                                  varsmatlevel$NameName[i])
-            level_namej <- paste0(varsmatlevel$Group[1], ":",
-                                  varsmatlevel$NameName[j], ":",
-                                  varsmatlevel$NameName[i])
-          } else {
-            level_namei <- varsmatlevel$NameName[i]
-            level_namej <- varsmatlevel$NameName[j]
-          }
+          level_namei <- varsmatlevel$NameName[i]
+          level_namej <- varsmatlevel$NameName[j]
           
           if(any(level_namei %in% rownames(cr), level_namej %in% rownames(cr))) {
-            varsmatlevel[i, paste0("Corr",j)] <- cr[which(rownames(cr) == level_namei),which(rownames(cr) == level_namej)]
+            corr <- cr[which(rownames(cr) == level_namei),which(rownames(cr) == level_namej)]
+            if(length(corr) == 0) {
+              corr <- 0
+            }
+            varsmatlevel[i, paste0("Corr",j)] <- corr
             varsmat[varsmat$Level==li,paste0("Corr",j)] <- NA
           }
         }
@@ -92,7 +62,7 @@ summary.WeMixResults <- function(object, ...) {
   #this is important for compatibility  with mixed.sdf
   object$vars  <- varsmat[,c("Variance", "Std. Error", "Std.Dev.")]
   x0names <- names(x0$vars)
-  x0names <- x0names[!grepl(":.*:", x0names)]
+  x0names <- x0names[!grepl(":.*:", x0names) & !grepl(".*\\..*\\..*", x0names)]
   rownames(object$vars)  <- x0names
   class(object) <- "summaryWeMixResults"
   return(object)
@@ -195,8 +165,8 @@ residuals.WeMixResults <- function(object,
   }
 }
 
-# TO-DO: same thing 
 #' @method residuals WeMixGLMResp
+#' @exportS3Method
 residuals.WeMixGLMResp <- function(object, type = c("deviance", "pearson",
                                                "working", "response"),
                               ...) {
@@ -442,13 +412,7 @@ waldTest <- function(fittedModel, type=c("beta", "Lambda") , coefs=NA, hypothesi
     }
     
     # Covariance matrix of beta
-    if(fittedModel$is_adaptive){
-      # this is a glm
-      VC <- makeSandwich(fittedModel) # calculates the sandwhich estimator of variance 
-      V_hat <- VC$VC[1:(q+1), 1:(q+1)]
-    } else {
-      V_hat <- fittedModel$cov_mat
-    }
+    V_hat <- fittedModel$cov_mat
    
     #estimates 
     ests <- fittedModel$coef
@@ -476,15 +440,18 @@ makeSandwich <- function(fittedModel) {
   #make same estimator based on 
 
   par <- c(fittedModel$coef, fittedModel$vars)
+  
   FisherInfInverse <- solve(fittedModel$invHessian)
   
   L <- jacobian(fittedModel$lnlf, par, top=FALSE)
   nGroups <- nrow(L)
   nParams <- length(par)
   J <- matrix(0,ncol=nParams, nrow=nParams)
+  
   for (i in 1:nGroups){
     J <- J + L[i,] %*% t(L[i,])
   }
+  
   J <- (nGroups/(nGroups-1))*J
   SE <- FisherInfInverse%*%J%*%FisherInfInverse
   colnames(SE) <- rownames(SE)<-names(par)
@@ -588,4 +555,59 @@ genUniqueVar <- function(df, new_var_name="unique") {
     new_var_name <- paste0(new_var_name,sample(letters,1))
   }
   return(new_var_name)
+}
+
+#' @export
+model.frame.WeMixResults <- function(formula, ...) {
+  res <- formula$mf
+  return(res)
+}
+
+#' @export
+model.matrix.WeMixResults <- function(object, ...) {
+  env <- environment(object$lnlf)
+  res <- get("X", env)
+  return(res)
+}
+
+#' @export
+terms.WeMixResults <- function(x, ...) {
+  terms(model.frame(x))
+}
+
+#' @export 
+#' @importFrom broom tidy
+#' @importFrom dplyr as_tibble
+tidy.WeMixResults <- function(x, ...) {
+  p <- length(x$coef)
+  fixed <- data.frame(
+    effect = rep("fixed", p),
+    group = rep(NA, p),
+    term = names(x$coef),
+    estimate = x$coef,
+    std.error = sqrt(diag(x$cov_mat)),
+    statistic = x$coef/sqrt(diag(x$cov_mat))
+  )
+  vc <- x$varDF
+  vc$cor <- NA
+  for(i in 1:nrow(vc)) {
+    # for each row that is a covariance, add data necessary to get correlation
+    if(!is.na(vc$var2[i])) {
+      v1 <- vc[is.na(vc$var2) & vc$grp == vc$grp[i] & vc$var1 == vc$var1[i], "vcov", drop=TRUE]
+      v2 <- vc[is.na(vc$var2) & vc$grp == vc$grp[i] & vc$var1 == vc$var2[i], "vcov", drop=TRUE]
+      vc$cor[i] <- vc$vcov[i] / sqrt(v1*v2)
+    }
+  }
+  ranef <- data.frame(
+    effect = rep("ran_pars", nrow(vc)),
+    group = vc$grp,
+    term = ifelse(is.na(vc$var2),
+                  ifelse(is.na(vc$var1), "sd__Observation", paste0("sd__",vc$var1)),
+                  paste0("cor__",vc$var1,".",vc$var2)),
+    estimate = ifelse(is.na(vc$var2), suppressWarnings(sqrt(vc$vcov)), vc$cor),
+    std.error = rep(NA, nrow(vc)),
+    statistic = rep(NA, nrow(vc))
+  )
+  res <- rbind(fixed, ranef)
+  as_tibble(res)
 }
